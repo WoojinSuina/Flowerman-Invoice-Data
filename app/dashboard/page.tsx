@@ -103,14 +103,37 @@ export default async function DashboardPage(props: {
     prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
   ]);
 
-  const topStoresRaw = await prisma.invoice.groupBy({
-    by: ["storeId"],
+  const monthInvoicesForStores = await prisma.invoice.findMany({
     where: thisMonth,
-    _sum: { calculatedAmountDueCents: true },
-    _count: true,
-    orderBy: { _sum: { calculatedAmountDueCents: "desc" } },
-    take: 5,
+    select: {
+      storeId: true,
+      calculatedAmountDueCents: true,
+      items: { select: { soldQuantity: true } },
+    },
   });
+  const storeAgg = new Map<
+    string,
+    { qtySold: number; revenueCents: number; invoiceCount: number }
+  >();
+  for (const inv of monthInvoicesForStores) {
+    const qtySold = inv.items.reduce((sum, item) => sum + item.soldQuantity, 0);
+    const existing = storeAgg.get(inv.storeId);
+    if (existing) {
+      existing.qtySold += qtySold;
+      existing.revenueCents += inv.calculatedAmountDueCents;
+      existing.invoiceCount += 1;
+    } else {
+      storeAgg.set(inv.storeId, {
+        qtySold,
+        revenueCents: inv.calculatedAmountDueCents,
+        invoiceCount: 1,
+      });
+    }
+  }
+  const topStoresRaw = [...storeAgg.entries()]
+    .map(([storeId, agg]) => ({ storeId, ...agg }))
+    .sort((a, b) => b.qtySold - a.qtySold)
+    .slice(0, 5);
   const stores = await prisma.store.findMany({
     where: { id: { in: topStoresRaw.map((s) => s.storeId) } },
   });
@@ -185,7 +208,7 @@ export default async function DashboardPage(props: {
               <thead>
                 <tr className="border-b text-left text-gray-500">
                   <th className="py-2 pr-4">Store</th>
-                  <th className="py-2 pr-4">Invoices</th>
+                  <th className="py-2 pr-4">Qty sold</th>
                   <th className="py-2 pr-4">Revenue</th>
                 </tr>
               </thead>
@@ -202,10 +225,8 @@ export default async function DashboardPage(props: {
                           <div className="text-xs text-gray-500">{store.address}</div>
                         )}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">{row._count}</td>
-                      <td className="py-2 pr-4 tabular-nums">
-                        {formatCents(row._sum.calculatedAmountDueCents ?? 0)}
-                      </td>
+                      <td className="py-2 pr-4 tabular-nums">{row.qtySold}</td>
+                      <td className="py-2 pr-4 tabular-nums">{formatCents(row.revenueCents)}</td>
                     </tr>
                   );
                 })}
