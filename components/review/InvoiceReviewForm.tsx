@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { validateInvoice, type LineItemInput } from "@/lib/validation/engine";
 import { centsToDollars, dollarsToCents, formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
+import { PdfPageImage } from "@/components/review/PdfPageImage";
 
 interface ReviewItem {
   id: string;
@@ -187,10 +188,9 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         )}
         {invoice.sourceImageUrl ? (
           invoice.sourceImageUrl.endsWith(".pdf") ? (
-            <iframe
+            <PdfPageImage
               src={invoice.sourceImageUrl}
-              title={`Scanned invoice ${invoice.invoiceNumber}`}
-              className="h-[calc(100vh-6rem)] w-full rounded border"
+              alt={`Scanned invoice ${invoice.invoiceNumber}`}
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
