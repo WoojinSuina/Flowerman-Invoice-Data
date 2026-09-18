@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { validateInvoice, type LineItemInput } from "@/lib/validation/engine";
 import { centsToDollars, dollarsToCents, formatCents } from "@/lib/money";
@@ -26,6 +27,7 @@ interface ReviewInvoice {
   totalCreditCents: number;
   totalAmountDueCents: number;
   items: ReviewItem[];
+  duplicateOf?: { id: string; invoiceNumber: string } | null;
 }
 
 function MoneyInput({
@@ -219,6 +221,17 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             </p>
           </div>
         </div>
+
+        {invoice.duplicateOf && (
+          <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Possible duplicate: invoice{" "}
+            <Link href={`/review/${invoice.duplicateOf.id}`} className="underline">
+              #{invoice.duplicateOf.invoiceNumber}
+            </Link>{" "}
+            at this store has the same date and total amount due — check whether
+            this is a separate delivery or an accidental re-scan before approving.
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">

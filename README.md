@@ -47,6 +47,22 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   `action: "auto-approved"`) so the trail shows nothing was skipped
   silently. 17 pre-existing PASS invoices with a $0.00 difference were
   backfilled to `APPROVED` the same way, one time, by hand.
+- **Duplicate-scan detection, two layers**: `Invoice` has a unique
+  constraint on `(invoiceNumber, storeId)` — an exact re-scan (same number
+  re-read the same way) is rejected outright, now with a human-readable
+  error (`An invoice numbered X already exists for this store — likely a
+  duplicate scan`) instead of the raw Prisma constraint message. That
+  constraint can't catch a re-scan that OCR reads slightly differently
+  though, so `processInvoicePage.ts` also checks for another invoice at the
+  same store with the same date and the same total amount due but a
+  *different* number; a hit sets `Invoice.possibleDuplicateOfId` (plain id,
+  no relation, looked up manually — same pattern as other cross-model joins
+  in this app) and forces `REVIEW` even if the math otherwise reconciled,
+  since a possible duplicate is exactly the kind of exception a human needs
+  to resolve. `InvoiceReviewForm` shows this as a banner linking to the
+  other invoice. There's no delete/merge action for confirmed duplicates
+  yet — the human resolves it by editing one of the two, the same as any
+  other REVIEW exception.
 
 ## What's built (Phase 3)
 

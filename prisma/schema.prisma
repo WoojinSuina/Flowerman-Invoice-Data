@@ -86,6 +86,14 @@ model Invoice {
   validationStatus          ValidationStatus @default(PROCESSING) @map("validation_status")
   validationSuggestions     Json?            @map("validation_suggestions") // array of suggestion strings
 
+  // Set at ingestion when another invoice at the same store, same date, and
+  // same total amount due already exists (but with a different invoice
+  // number — an exact number match is rejected outright by the unique
+  // constraint below). Catches a re-scan that OCR reads slightly
+  // differently. Plain id, no relation — looked up manually when needed,
+  // same pattern as Store/Product joins elsewhere in this app.
+  possibleDuplicateOfId String? @map("possible_duplicate_of_id")
+
   // Raw AI output, preserved forever, never overwritten
   rawExtraction Json? @map("raw_extraction")
 

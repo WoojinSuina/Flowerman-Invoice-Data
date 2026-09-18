@@ -1,4 +1,4 @@
-import type { Prisma, Store } from "@prisma/client";
+import { Prisma, type Store } from "@prisma/client";
 import { ClaudeInvoiceExtractor } from "@/lib/extraction/providers/claude";
 import { validateInvoice, type InvoiceValidationResult } from "@/lib/validation/engine";
 import { toValidationInput } from "@/lib/validation/fromExtraction";
@@ -108,6 +108,19 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
 
     const store = await resolveStore(extracted);
 
+    // Catches a re-scan that OCR reads slightly differently (so the exact
+    // invoiceNumber+storeId unique constraint below wouldn't catch it): same
+    // store, same date, same total, but a different invoice number.
+    const possibleDuplicate = await prisma.invoice.findFirst({
+      where: {
+        storeId: store.id,
+        invoiceDate: new Date(extracted.invoiceDate),
+        totalAmountDueCents: dollarsToCents(extracted.totalAmountDue),
+        invoiceNumber: { not: extracted.invoiceNumber },
+      },
+      select: { id: true, invoiceNumber: true },
+    });
+
     const productIdByName = new Map(
       await Promise.all(
         [...new Set(result.items.map((item) => item.productName))].map(async (name) => {
@@ -124,8 +137,12 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     // A PASS with an exact $0.00 difference reconciled perfectly — there's
     // no exception left for a human to resolve, so skip the manual Approve
     // click and go straight to APPROVED (still logged in the audit trail,
-    // just with "system" as the actor instead of a person).
-    const autoApproved = result.status === "PASS" && result.differenceCents === 0;
+    // just with "system" as the actor instead of a person). A possible
+    // duplicate always forces REVIEW regardless, since it's exactly the
+    // kind of exception a human needs to resolve.
+    const autoApproved =
+      !possibleDuplicate && result.status === "PASS" && result.differenceCents === 0;
+    const finalStatus = possibleDuplicate ? "REVIEW" : result.status;
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -139,8 +156,9 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         calculatedTotalCreditCents: result.calculatedTotalCreditCents,
         calculatedAmountDueCents: result.calculatedAmountDueCents,
         validationDifferenceCents: result.differenceCents,
-        validationStatus: autoApproved ? "APPROVED" : result.status,
+        validationStatus: autoApproved ? "APPROVED" : finalStatus,
         approvedAt: autoApproved ? new Date() : null,
+        possibleDuplicateOfId: possibleDuplicate?.id ?? null,
         validationSuggestions: result.suggestions as unknown as Prisma.InputJsonValue,
         rawExtraction: extracted,
         sourceFile: sourceFileName,
@@ -194,7 +212,11 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
 
     return { ok: true, invoice, validation: result };
   } catch (err) {
-    const message = (err as Error).message;
+    const isDuplicateInvoiceNumber =
+      err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+    const message = isDuplicateInvoiceNumber
+      ? `An invoice numbered ${extracted.invoiceNumber} already exists for this store — likely a duplicate scan.`
+      : `Persisting invoice failed: ${(err as Error).message}`;
     await prisma.extractionAttempt.create({
       data: {
         provider: extractor.providerName,
@@ -205,6 +227,6 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         errorMessage: message,
       },
     });
-    return { ok: false, sourcePage, error: `Persisting invoice failed: ${message}` };
+    return { ok: false, sourcePage, error: message };
   }
 }

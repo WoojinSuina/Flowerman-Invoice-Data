@@ -16,6 +16,13 @@ export default async function ReviewDetailPage(props: { params: Promise<{ id: st
     notFound();
   }
 
+  const duplicateOf = invoice.possibleDuplicateOfId
+    ? await prisma.invoice.findUnique({
+        where: { id: invoice.possibleDuplicateOfId },
+        select: { id: true, invoiceNumber: true },
+      })
+    : null;
+
   return (
     <main className="mx-auto max-w-7xl p-6">
       <InvoiceReviewForm
@@ -25,6 +32,7 @@ export default async function ReviewDetailPage(props: { params: Promise<{ id: st
           storeName: invoice.store.name,
           sourceImageUrl: invoice.sourceImageUrl,
           validationStatus: invoice.validationStatus,
+          duplicateOf,
           totalChargesCents: invoice.totalChargesCents,
           totalCreditCents: invoice.totalCreditCents,
           totalAmountDueCents: invoice.totalAmountDueCents,
