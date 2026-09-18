@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
+import { MonthSelect } from "@/components/dashboard/MonthSelect";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -70,13 +71,30 @@ export default async function DashboardPage(props: {
   const searchParams = await props.searchParams;
   const monthStart = parseMonthParam(searchParams.month);
   const nextMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
-  const prevMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 1, 1));
   const monthLabel = monthStart.toLocaleDateString(undefined, {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
   });
   const thisMonth = { invoiceDate: { gte: monthStart, lt: nextMonthStart } };
+
+  const monthRows = await prisma.$queryRaw<{ month: string }[]>`
+    SELECT DISTINCT to_char(invoice_date, 'YYYY-MM') AS month
+    FROM invoices
+    ORDER BY month DESC
+  `;
+  const monthValues = new Set(monthRows.map((r) => r.month));
+  monthValues.add(monthParam(monthStart));
+  const monthOptions = [...monthValues]
+    .sort((a, b) => (a < b ? 1 : -1))
+    .map((value) => ({
+      value,
+      label: parseMonthParam(value).toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+    }));
 
   const [totalInvoices, revenue, potentialRevenue, reviewCount, approvedCount] = await Promise.all([
     prisma.invoice.count({ where: thisMonth }),
@@ -137,20 +155,8 @@ export default async function DashboardPage(props: {
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
 
-      <div className="mb-4 flex items-center gap-4">
-        <Link
-          href={`/dashboard?month=${monthParam(prevMonthStart)}`}
-          className="text-sm text-blue-600 underline"
-        >
-          ← Previous month
-        </Link>
-        <span className="text-lg font-bold">{monthLabel}</span>
-        <Link
-          href={`/dashboard?month=${monthParam(nextMonthStart)}`}
-          className="text-sm text-blue-600 underline"
-        >
-          Next month →
-        </Link>
+      <div className="mb-4">
+        <MonthSelect value={monthParam(monthStart)} options={monthOptions} />
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
