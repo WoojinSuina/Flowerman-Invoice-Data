@@ -88,6 +88,7 @@ export default async function DashboardPage(props: {
 
   const topStoresRaw = await prisma.invoice.groupBy({
     by: ["storeId"],
+    where: thisMonth,
     _sum: { calculatedAmountDueCents: true },
     _count: true,
     orderBy: { _sum: { calculatedAmountDueCents: "desc" } },
@@ -100,7 +101,7 @@ export default async function DashboardPage(props: {
 
   const topProductsRaw = await prisma.invoiceItem.groupBy({
     by: ["productId"],
-    where: { productId: { not: null } },
+    where: { productId: { not: null }, invoice: thisMonth },
     _sum: { netSoldAmountCents: true, soldQuantity: true },
     _count: true,
     orderBy: { _sum: { netSoldAmountCents: "desc" } },
@@ -112,6 +113,7 @@ export default async function DashboardPage(props: {
   const productById = new Map(products.map((p) => [p.id, p]));
 
   const allInvoiceDates = await prisma.invoice.findMany({
+    where: thisMonth,
     select: { invoiceDate: true, calculatedAmountDueCents: true },
   });
   const revenueByWeek = new Map<string, { weekStart: Date; revenueCents: number; count: number }>();
@@ -178,7 +180,7 @@ export default async function DashboardPage(props: {
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
-          <h2 className="mb-2 font-medium">Top stores</h2>
+          <h2 className="mb-2 font-medium">Top stores, {monthLabel}</h2>
           {topStoresRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
@@ -216,7 +218,7 @@ export default async function DashboardPage(props: {
         </div>
 
         <div>
-          <h2 className="mb-2 font-medium">Top products</h2>
+          <h2 className="mb-2 font-medium">Top products, {monthLabel}</h2>
           {topProductsRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
@@ -248,7 +250,7 @@ export default async function DashboardPage(props: {
       </div>
 
       <div className="mt-8">
-        <h2 className="mb-2 font-medium">Revenue by week</h2>
+        <h2 className="mb-2 font-medium">Revenue by week, {monthLabel}</h2>
         {weeklyRevenue.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet.</p>
         ) : (
