@@ -161,16 +161,35 @@ security patches. Notable side effects:
   Products + logout), replacing the ad-hoc header links each page used
   to hand-roll. `/` now redirects straight to `/dashboard`.
 
+## What's built (Phase 5)
+
+- `app/recommendations` — one suggested delivery quantity per store per
+  product: the average `soldQuantity` across that store+product's invoice
+  history, rounded to the nearest whole unit. Transparent by design (the
+  README's own "not ML" goal for this phase) — average delivered and
+  average returned are shown alongside every suggestion so the math behind
+  the number is visible, not just the output.
+- Unlike the Dashboard/Products aggregates, this query **only** counts
+  `PASS`/`APPROVED` invoices, excluding `REVIEW`. A recommendation directly
+  drives how much product gets ordered, so letting an uncorrected AI
+  misread (e.g. a REVIEW-flagged "returned > delivered" line) skew it is a
+  worse failure mode here than on a read-only KPI tile — confirmed by
+  hitting exactly this during testing (a REVIEW invoice with
+  returned > delivered produced a negative suggested quantity before this
+  filter was added). A `Math.max(0, ...)` clamp on the rounded result is
+  kept as a second line of defense.
+- No history-length threshold — a store/product pair backed by a single
+  invoice gets a suggestion just like one backed by twenty; the "Based on
+  N invoices" column makes the confidence visible instead of hiding
+  low-data pairs.
+
 ## What's NOT built yet (by design — see Phases below)
 
-- Delivery recommendations (Phase 5)
 - Adding/removing line items during review (corrections only edit existing
   items by id)
 - Async/polled batch processing — uploads are currently synchronous (see
   "Architectural notes" below for why, and when to revisit)
 - Charts on the Dashboard — currently KPI tiles + tables only
-
-The next milestone is Phase 5 (delivery recommendations).
 
 ## Setup
 
