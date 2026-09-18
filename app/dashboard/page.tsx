@@ -109,23 +109,26 @@ export default async function DashboardPage(props: {
     select: {
       storeId: true,
       calculatedAmountDueCents: true,
-      items: { select: { soldQuantity: true } },
+      items: { select: { soldQuantity: true, deliveredQuantity: true } },
     },
   });
   const storeAgg = new Map<
     string,
-    { qtySold: number; revenueCents: number; invoiceCount: number }
+    { qtySold: number; qtyDelivered: number; revenueCents: number; invoiceCount: number }
   >();
   for (const inv of monthInvoicesForStores) {
     const qtySold = inv.items.reduce((sum, item) => sum + item.soldQuantity, 0);
+    const qtyDelivered = inv.items.reduce((sum, item) => sum + item.deliveredQuantity, 0);
     const existing = storeAgg.get(inv.storeId);
     if (existing) {
       existing.qtySold += qtySold;
+      existing.qtyDelivered += qtyDelivered;
       existing.revenueCents += inv.calculatedAmountDueCents;
       existing.invoiceCount += 1;
     } else {
       storeAgg.set(inv.storeId, {
         qtySold,
+        qtyDelivered,
         revenueCents: inv.calculatedAmountDueCents,
         invoiceCount: 1,
       });
@@ -143,6 +146,7 @@ export default async function DashboardPage(props: {
     storeName: storeById.get(row.storeId)?.name ?? row.storeId,
     storeAddress: storeById.get(row.storeId)?.address ?? null,
     qtySold: row.qtySold,
+    qtyDelivered: row.qtyDelivered,
     revenueCents: row.revenueCents,
   }));
   const topFiveStores = topStoresRaw.slice(0, 5);
@@ -150,7 +154,7 @@ export default async function DashboardPage(props: {
   const topProductsRaw = await prisma.invoiceItem.groupBy({
     by: ["productId"],
     where: { productId: { not: null }, invoice: thisMonth },
-    _sum: { netSoldAmountCents: true, soldQuantity: true },
+    _sum: { netSoldAmountCents: true, soldQuantity: true, deliveredQuantity: true },
     _count: true,
     orderBy: { _sum: { netSoldAmountCents: "desc" } },
     take: 5,
@@ -219,7 +223,7 @@ export default async function DashboardPage(props: {
               <thead>
                 <tr className="border-b text-left text-gray-500">
                   <th className="py-2 pr-4">Store</th>
-                  <th className="py-2 pr-4">Qty sold</th>
+                  <th className="py-2 pr-4">Sold / delivered</th>
                   <th className="py-2 pr-4">Revenue</th>
                 </tr>
               </thead>
@@ -236,7 +240,9 @@ export default async function DashboardPage(props: {
                           <div className="text-xs text-gray-500">{store.address}</div>
                         )}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">{row.qtySold}</td>
+                      <td className="py-2 pr-4 tabular-nums">
+                        {row.qtySold} / {row.qtyDelivered}
+                      </td>
                       <td className="py-2 pr-4 tabular-nums">{formatCents(row.revenueCents)}</td>
                     </tr>
                   );
@@ -255,7 +261,7 @@ export default async function DashboardPage(props: {
               <thead>
                 <tr className="border-b text-left text-gray-500">
                   <th className="py-2 pr-4">Product</th>
-                  <th className="py-2 pr-4">Qty sold</th>
+                  <th className="py-2 pr-4">Sold / delivered</th>
                   <th className="py-2 pr-4">Revenue</th>
                 </tr>
               </thead>
@@ -265,7 +271,9 @@ export default async function DashboardPage(props: {
                   return (
                     <tr key={row.productId} className="border-b">
                       <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
-                      <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
+                      <td className="py-2 pr-4 tabular-nums">
+                        {row._sum.soldQuantity ?? 0} / {row._sum.deliveredQuantity ?? 0}
+                      </td>
                       <td className="py-2 pr-4 tabular-nums">
                         {formatCents(row._sum.netSoldAmountCents ?? 0)}
                       </td>

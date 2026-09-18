@@ -9,6 +9,7 @@ interface StoreRow {
   storeName: string;
   storeAddress: string | null;
   qtySold: number;
+  qtyDelivered: number;
   revenueCents: number;
 }
 
@@ -49,7 +50,7 @@ export function StoreListModal({ stores }: { stores: StoreRow[] }) {
                 <thead>
                   <tr className="border-b text-left text-gray-500">
                     <th className="py-2 pr-4">Store</th>
-                    <th className="py-2 pr-4">Qty sold</th>
+                    <th className="py-2 pr-4">Sold / delivered</th>
                     <th className="py-2 pr-4">Revenue</th>
                   </tr>
                 </thead>
@@ -64,7 +65,9 @@ export function StoreListModal({ stores }: { stores: StoreRow[] }) {
                           <div className="text-xs text-gray-500">{s.storeAddress}</div>
                         )}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">{s.qtySold}</td>
+                      <td className="py-2 pr-4 tabular-nums">
+                        {s.qtySold} / {s.qtyDelivered}
+                      </td>
                       <td className="py-2 pr-4 tabular-nums">{formatCents(s.revenueCents)}</td>
                     </tr>
                   ))}
