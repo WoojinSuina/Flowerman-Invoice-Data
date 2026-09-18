@@ -4,13 +4,26 @@ import {
   ExtractionValidationError,
   type ExtractedInvoice,
   type InvoiceExtractor,
-} from "../types";
+} from "../types.ts";
 
 const EXTRACTION_PROMPT = `You are extracting structured data from a scanned flower-delivery invoice.
 
 Some fields are printed; RETURNED quantities and some totals may be handwritten
 and harder to read. For every field you are uncertain about (especially
 handwritten numbers), reflect that in a lower confidence score.
+
+IMPORTANT — do not confuse the vendor with the destination store:
+The letterhead at the very top of the invoice (a business name, phone
+number, and address on the first one or two lines) belongs to the flower
+delivery VENDOR who printed this invoice pad. It is the SAME on every
+invoice and is NEVER the storeName or storeAddress.
+The actual destination store is identified further down on the line
+starting with "NAME" (e.g. "NAME VALERO 829 W MILLER RD GARLAND TX75041").
+Extract storeName and storeAddress from that NAME line only — storeName is
+the store/chain name at the start of that line (e.g. "VALERO"), and
+storeAddress is the address that follows it on the same line (e.g.
+"829 W MILLER RD GARLAND TX75041"). storeNumber comes from the separate
+"NO:" line above it.
 
 Return ONLY a JSON object with this exact shape, and nothing else — no markdown
 fences, no commentary:
