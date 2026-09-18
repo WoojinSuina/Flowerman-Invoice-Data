@@ -46,10 +46,20 @@ function StatTile({
 }
 
 export default async function DashboardPage() {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const monthLabel = monthStart.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const thisMonth = { invoiceDate: { gte: monthStart, lt: nextMonthStart } };
+
   const [totalInvoices, revenue, potentialRevenue, reviewCount, approvedCount] = await Promise.all([
     prisma.invoice.count(),
-    prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true } }),
-    prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true } }),
+    prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
+    prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
     prisma.invoice.count({ where: { validationStatus: "REVIEW" } }),
     prisma.invoice.count({ where: { validationStatus: "APPROVED" } }),
   ]);
@@ -106,11 +116,11 @@ export default async function DashboardPage() {
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
-          label="Potential revenue (no returns)"
+          label={`Potential revenue, ${monthLabel} (no returns)`}
           value={formatCents(potentialRevenue._sum.calculatedTotalChargesCents ?? 0)}
         />
         <StatTile
-          label="Total revenue"
+          label={`Revenue, ${monthLabel}`}
           value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
         />
         <StatTile
