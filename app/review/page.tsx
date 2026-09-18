@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
+import { LogoutButton } from "@/components/LogoutButton";
 import type { ValidationStatus } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL")[] = ["REVIEW", "PASS", "APPROVED", "FAILED", "ALL"];
@@ -23,9 +24,12 @@ export default async function ReviewListPage({
     <main className="mx-auto max-w-5xl p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Invoice Review</h1>
-        <Link href="/jobs" className="text-sm text-blue-600 underline">
-          View batch jobs
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/jobs" className="text-sm text-blue-600 underline">
+            View batch jobs
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       <nav className="mb-6 flex gap-2">

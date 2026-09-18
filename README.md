@@ -64,12 +64,23 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
 - `InvoiceReviewForm` now renders PDF-sourced pages via a native `<iframe>`
   instead of `<img>`.
 
+## What's built (Auth)
+
+- `middleware.ts` — a single shared-secret gate (`AUTH_SECRET`) in front of
+  every route except `/login` and `POST /api/login`: pages redirect to
+  `/login`, API routes get a `401`.
+- `app/login/page.tsx` + `app/api/login/route.ts` — a password form that
+  sets a long-lived (1 year), `httpOnly` cookie on success.
+- `app/api/logout/route.ts` + `components/LogoutButton.tsx` — clears the
+  cookie.
+- There's one shared password for the whole family, not per-user accounts
+  — sufficient for this app's threat model (keep strangers out), not a
+  general-purpose auth system.
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Dashboard, Stores, Products analytics screens (Phase 4)
 - Delivery recommendations (Phase 5)
-- Auth middleware (a stub is planned but not wired up — the Review UI is
-  currently unauthenticated)
 - Adding/removing line items during review (corrections only edit existing
   items by id)
 - Async/polled batch processing — uploads are currently synchronous (see
@@ -96,7 +107,7 @@ npm run db:generate
 | `SUPABASE_URL` | Yes (Phase 2) | Supabase → Project Settings → API → Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (Phase 2) | Supabase → Project Settings → API → `service_role` secret |
 | `SUPABASE_BUCKET` | Yes (Phase 2) | Name of a **public** Storage bucket you create, e.g. `invoice-scans` |
-| `AUTH_SECRET` | Yes (Phase 1 auth) | any random string, e.g. `openssl rand -hex 32` |
+| `AUTH_SECRET` | Yes | The shared family login password (also used as the session cookie value). Any string, e.g. `openssl rand -hex 32`. |
 
 ## Local development
 

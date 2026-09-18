@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { StatusBadge } from "@/components/review/StatusBadge";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export default async function JobsListPage() {
   const jobs = await prisma.processingJob.findMany({
@@ -12,9 +13,12 @@ export default async function JobsListPage() {
     <main className="mx-auto max-w-5xl p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Batch Jobs</h1>
-        <Link href="/review" className="text-sm text-blue-600 underline">
-          Go to invoice review
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/review" className="text-sm text-blue-600 underline">
+            Go to invoice review
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       {jobs.length === 0 ? (
