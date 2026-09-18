@@ -96,12 +96,11 @@ export default async function DashboardPage(props: {
       }),
     }));
 
-  const [totalInvoices, revenue, potentialRevenue, reviewCount, approvedCount] = await Promise.all([
+  const [totalInvoices, revenue, potentialRevenue, reviewCount] = await Promise.all([
     prisma.invoice.count({ where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
     prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
-    prisma.invoice.count({ where: { ...thisMonth, validationStatus: "APPROVED" } }),
   ]);
 
   const topStoresRaw = await prisma.invoice.groupBy({
@@ -173,11 +172,6 @@ export default async function DashboardPage(props: {
           label="Needs review"
           value={reviewCount.toLocaleString()}
           href="/review?status=REVIEW"
-        />
-        <StatTile
-          label="Approved"
-          value={approvedCount.toLocaleString()}
-          href="/review?status=APPROVED"
         />
       </div>
 
