@@ -215,6 +215,12 @@ against production `DATABASE_URL` as part of your deploy step.
 
 ## Architectural notes
 
+- **`next.config.ts`**: sets `experimental.proxyClientMaxBodySize: "25mb"`.
+  Next.js buffers every request body passing through `proxy.ts` (needed
+  there to check the auth cookie) up to a default of 10MB, silently
+  truncating anything larger — which corrupts a multipart upload and
+  crashes `request.formData()` with an opaque error. Keep this above
+  `MAX_FILE_BYTES` in `app/api/invoices/upload/route.ts` (currently 20MB).
 - **Currency**: everything is integer cents (`lib/money.ts`). Never compare
   floats for money.
 - **Provider independence**: `lib/validation/engine.ts` imports nothing

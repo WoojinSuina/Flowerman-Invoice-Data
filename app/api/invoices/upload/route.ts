@@ -5,7 +5,7 @@ import { processInvoicePage, type ProcessPageResult } from "@/lib/invoices/proce
 
 export const runtime = "nodejs";
 
-const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB — keep below next.config.ts's proxyClientMaxBodySize
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
 
 interface PageToProcess {
@@ -15,7 +15,15 @@ interface PageToProcess {
 }
 
 export async function POST(req: NextRequest) {
-  const formData = await req.formData();
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Could not read the uploaded file", detail: (err as Error).message },
+      { status: 400 }
+    );
+  }
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
