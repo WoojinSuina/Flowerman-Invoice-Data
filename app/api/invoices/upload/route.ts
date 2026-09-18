@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
-import { ClaudeInvoiceExtractor } from "@/lib/extraction/providers/claude";
-import { validateInvoice } from "@/lib/validation/engine";
-import { toValidationInput } from "@/lib/validation/fromExtraction";
 import { prisma } from "@/lib/db/client";
-import { dollarsToCents } from "@/lib/money";
-import { uploadInvoiceImage } from "@/lib/storage/supabase";
+import { splitPdfIntoPages } from "@/lib/pdf/splitPages";
+import { processInvoicePage, type ProcessPageResult } from "@/lib/invoices/processInvoicePage";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB
-const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
 
-/**
- * PHASE 1 endpoint: a single invoice IMAGE in, one Invoice record out.
- * Multi-page PDF splitting and batch job orchestration is Phase 3 — see
- * README "Development Phases".
- */
+interface PageToProcess {
+  buffer: Buffer;
+  mimeType: string;
+  sourcePage: number;
+}
+
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file");
@@ -35,97 +32,70 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const extractor = new ClaudeInvoiceExtractor();
 
-  let extracted;
-  try {
-    extracted = await extractor.extractInvoice(buffer, file.type);
-  } catch (err) {
-    // Record the failed attempt for auditability even though there's no
-    // invoice row yet to attach it to.
-    await prisma.extractionAttempt.create({
+  let pages: PageToProcess[];
+  if (file.type === "application/pdf") {
+    try {
+      const splitPages = await splitPdfIntoPages(buffer);
+      pages = splitPages.map((p) => ({
+        buffer: p.buffer,
+        mimeType: "application/pdf",
+        sourcePage: p.pageNumber,
+      }));
+    } catch (err) {
+      return NextResponse.json(
+        { error: "Could not split PDF", detail: (err as Error).message },
+        { status: 400 }
+      );
+    }
+  } else {
+    pages = [{ buffer, mimeType: file.type, sourcePage: 1 }];
+  }
+
+  const job = await prisma.processingJob.create({
+    data: { filename: file.name, totalPages: pages.length, status: "PROCESSING" },
+  });
+
+  const results: ProcessPageResult[] = [];
+  for (const page of pages) {
+    const result = await processInvoicePage({
+      buffer: page.buffer,
+      mimeType: page.mimeType,
+      sourceFileName: file.name,
+      sourcePage: page.sourcePage,
+      processingJobId: job.id,
+    });
+    results.push(result);
+
+    await prisma.processingJob.update({
+      where: { id: job.id },
       data: {
-        provider: extractor.providerName,
-        rawResponse: { error: (err as Error).message },
-        succeeded: false,
-        errorMessage: (err as Error).message,
+        processedPages: { increment: 1 },
+        passedPages: {
+          increment: result.ok && result.invoice.validationStatus === "PASS" ? 1 : 0,
+        },
+        reviewPages: {
+          increment: result.ok && result.invoice.validationStatus === "REVIEW" ? 1 : 0,
+        },
+        failedPages: { increment: result.ok ? 0 : 1 },
       },
     });
-    return NextResponse.json(
-      { error: "Extraction failed", detail: (err as Error).message },
-      { status: 422 }
-    );
   }
 
-  let uploadedImage;
-  try {
-    uploadedImage = await uploadInvoiceImage(buffer, file.type);
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Image storage upload failed", detail: (err as Error).message },
-      { status: 502 }
-    );
-  }
-
-  const validationInput = toValidationInput(extracted);
-  const result = validateInvoice(validationInput);
-
-  const store = await prisma.store.upsert({
-    where: { storeNumber: extracted.storeNumber },
-    update: { name: extracted.storeName, address: extracted.storeAddress },
-    create: {
-      storeNumber: extracted.storeNumber,
-      name: extracted.storeName,
-      address: extracted.storeAddress,
-    },
-  });
-
-  const invoice = await prisma.invoice.create({
+  const anyFailed = results.some((r) => !r.ok);
+  const completedJob = await prisma.processingJob.update({
+    where: { id: job.id },
     data: {
-      invoiceNumber: extracted.invoiceNumber,
-      invoiceDate: new Date(extracted.invoiceDate),
-      storeId: store.id,
-      totalChargesCents: dollarsToCents(extracted.totalCharges),
-      totalCreditCents: dollarsToCents(extracted.totalCredit),
-      totalAmountDueCents: dollarsToCents(extracted.totalAmountDue),
-      calculatedTotalChargesCents: result.calculatedTotalChargesCents,
-      calculatedTotalCreditCents: result.calculatedTotalCreditCents,
-      calculatedAmountDueCents: result.calculatedAmountDueCents,
-      validationDifferenceCents: result.differenceCents,
-      validationStatus: result.status,
-      validationSuggestions: result.suggestions as unknown as Prisma.InputJsonValue,
-      rawExtraction: extracted,
-      sourceFile: file.name,
-      sourcePage: 1,
-      sourceImageUrl: uploadedImage.url,
-      items: {
-        create: result.items.map((item, index) => ({
-          productName: item.productName,
-          lineNumber: index,
-          retailPriceCents: dollarsToCents(
-            extracted.products.find((p) => p.productName === item.productName)?.retailPrice ?? 0
-          ),
-          unitCostCents: item.unitCostCents,
-          deliveredQuantity: item.deliveredQuantity,
-          returnedQuantity: item.returnedQuantity,
-          soldQuantity: item.soldQuantity,
-          deliveredAmountCents: item.deliveredAmountCents,
-          returnCreditCents: item.returnCreditCents,
-          netSoldAmountCents: item.netSoldAmountCents,
-          confidence:
-            extracted.products.find((p) => p.productName === item.productName)?.confidence ?? null,
-        })),
-      },
-      extractionAttempts: {
-        create: {
-          provider: extractor.providerName,
-          rawResponse: extracted,
-          succeeded: true,
-        },
-      },
+      status: anyFailed ? "COMPLETED_WITH_ERRORS" : "COMPLETED",
+      completedAt: new Date(),
     },
-    include: { items: true },
   });
 
-  return NextResponse.json({ invoice, validation: result });
+  const responseResults = results.map((r) =>
+    r.ok === true
+      ? { sourcePage: r.invoice.sourcePage, invoice: r.invoice, validation: r.validation }
+      : { sourcePage: r.sourcePage, error: r.error }
+  );
+
+  return NextResponse.json({ job: completedJob, results: responseResults });
 }

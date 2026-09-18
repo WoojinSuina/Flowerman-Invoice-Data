@@ -39,12 +39,14 @@ export interface InvoiceExtractor {
   readonly providerName: string;
 
   /**
-   * Extract structured invoice data from a single invoice page image.
-   * Implementations MUST validate their raw response against
+   * Extract structured invoice data from a single invoice page. `mimeType`
+   * is usually an image type, but may be "application/pdf" — in that case
+   * `fileBuffer` is a single-page PDF (see lib/pdf/splitPages.ts), not an
+   * image. Implementations MUST validate their raw response against
    * ExtractedInvoiceSchema before returning, and should throw a
    * descriptive error (not return malformed data) on failure.
    */
-  extractInvoice(imageBuffer: Buffer, mimeType: string): Promise<ExtractedInvoice>;
+  extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<ExtractedInvoice>;
 }
 
 /** Thrown when a provider's raw response fails schema validation. */

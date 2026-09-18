@@ -21,7 +21,12 @@ export default async function ReviewListPage({
 
   return (
     <main className="mx-auto max-w-5xl p-6">
-      <h1 className="mb-4 text-2xl font-semibold">Invoice Review</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Invoice Review</h1>
+        <Link href="/jobs" className="text-sm text-blue-600 underline">
+          View batch jobs
+        </Link>
+      </div>
 
       <nav className="mb-6 flex gap-2">
         {FILTERS.map((f) => (

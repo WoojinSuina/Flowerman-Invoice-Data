@@ -52,24 +52,36 @@ export class ClaudeInvoiceExtractor implements InvoiceExtractor {
     this.client = new Anthropic({ apiKey });
   }
 
-  async extractInvoice(imageBuffer: Buffer, mimeType: string): Promise<ExtractedInvoice> {
+  async extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<ExtractedInvoice> {
+    const isPdf = mimeType === "application/pdf";
+    const documentOrImageBlock = isPdf
+      ? {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: fileBuffer.toString("base64"),
+          },
+        }
+      : {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mimeType as "image/jpeg" | "image/png" | "image/webp",
+            data: fileBuffer.toString("base64"),
+          },
+        };
+
     const response = await this.client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2000,
       messages: [
         {
           role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mimeType as "image/jpeg" | "image/png" | "image/webp",
-                data: imageBuffer.toString("base64"),
-              },
-            },
-            { type: "text", text: EXTRACTION_PROMPT },
-          ],
+          // The `document` block above isn't in this SDK version's (0.32.x)
+          // bundled types yet, though the API itself accepts it (PDF input,
+          // no beta header). Cast narrowly rather than bumping the SDK.
+          content: [documentOrImageBlock, { type: "text", text: EXTRACTION_PROMPT }] as unknown as Anthropic.MessageCreateParams["messages"][number]["content"],
         },
       ],
     });

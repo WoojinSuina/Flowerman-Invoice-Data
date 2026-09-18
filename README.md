@@ -40,18 +40,42 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   as you type (via `validateInvoice`, no server round-trip), Save and
   Approve actions.
 
+## What's built (Phase 3)
+
+- `lib/pdf/splitPages.ts` — splits a multi-page PDF into single-page PDFs
+  with `pdf-lib` (pure JS, no native/canvas dependency). Unit tested with
+  in-memory generated fixture PDFs.
+- `lib/extraction/providers/claude.ts` — now sends PDF pages to Claude as a
+  `document` content block directly (no rasterization needed).
+- `lib/invoices/processInvoicePage.ts` — the shared "one page's bytes in,
+  one persisted Invoice out" logic, reused by every page of a batch (and by
+  a plain single-image upload, now handled as a batch of one). Every
+  failure mode (extraction, storage, DB write) is caught per-page and
+  logged as an audit-trail `ExtractionAttempt` rather than aborting the
+  whole batch.
+- `app/api/invoices/upload/route.ts` — now accepts `application/pdf` in
+  addition to images. Every upload creates a `ProcessingJob`, splits PDFs
+  into pages, and processes them sequentially, updating job progress as it
+  goes. Response shape is now `{ job, results[] }` (was `{ invoice,
+  validation }` in Phase 1/2).
+- `app/api/jobs/route.ts` / `[id]/route.ts` and `app/jobs` — batch job
+  queue and detail view (which invoices a batch produced, and which pages
+  failed and why).
+- `InvoiceReviewForm` now renders PDF-sourced pages via a native `<iframe>`
+  instead of `<img>`.
+
 ## What's NOT built yet (by design — see Phases below)
 
-- Multi-page PDF splitting and batch job processing (§9, Phase 3)
 - Dashboard, Stores, Products analytics screens (Phase 4)
 - Delivery recommendations (Phase 5)
 - Auth middleware (a stub is planned but not wired up — the Review UI is
   currently unauthenticated)
 - Adding/removing line items during review (corrections only edit existing
   items by id)
+- Async/polled batch processing — uploads are currently synchronous (see
+  "Architectural notes" below for why, and when to revisit)
 
-The next milestone is Phase 3 (multi-page PDF splitting and batch
-processing), since Phase 2 assumes one invoice image per upload.
+The next milestone is Phase 4 (Dashboard, Stores, Products analytics).
 
 ## Setup
 
@@ -80,15 +104,18 @@ npm run db:generate
 npm run dev
 ```
 
-Test the Phase 1 pipeline directly:
+Test the upload pipeline directly (accepts a single image, or a multi-page
+PDF which is split and processed one page per invoice):
 
 ```bash
 curl -X POST http://localhost:3000/api/invoices/upload \
-  -F "file=@/path/to/one_invoice_page.jpg"
+  -F "file=@/path/to/invoices.pdf"
 ```
 
-Response includes the extracted data, calculated totals, PASS/REVIEW
-status, and (if REVIEW) quantity-error suggestions.
+Response is `{ job, results[] }` — `job` is the `ProcessingJob` row
+(progress/pass/review/failed counts), `results[]` has one entry per page:
+either `{ sourcePage, invoice, validation }` on success or `{ sourcePage,
+error }` on failure. A single-image upload is just a batch of one.
 
 ## Testing
 
@@ -127,9 +154,18 @@ against production `DATABASE_URL` as part of your deploy step.
   table preserve what the AI originally said, forever. `manual_corrections`
   records every human edit with original/corrected/timestamp. Nothing is
   overwritten.
-- **Async processing (Phase 3)**: for the MVP's expected volume (~100
-  pages/week), a simple in-process queue (e.g. sequential processing with
-  a `ProcessingJob` progress row polled by the client) is sufficient — no
-  need for Redis/BullMQ yet. Revisit if volume grows to the point where a
-  single server process can't keep up or you need retry/backoff semantics
-  beyond a try/catch loop.
+- **Batch processing is synchronous (Phase 3)**: a PDF upload splits and
+  processes every page sequentially within the same HTTP request, only
+  returning once the whole batch is done. This is deliberately simple and
+  fine for local/self-hosted use at the MVP's expected volume (~100
+  pages/week). **Revisit before deploying to Vercel** — a large batch (many
+  pages, each a multi-second Claude call) can exceed serverless function
+  duration limits. The fix, when needed, is exactly what was originally
+  anticipated here: move the loop off the request thread and have the
+  client poll the `ProcessingJob` row for progress — no Redis/BullMQ
+  required at this volume, just moving where the loop runs.
+- **`document`-block type gap**: `lib/extraction/providers/claude.ts` casts
+  around a TypeScript type gap in the pinned `@anthropic-ai/sdk@^0.32.0`
+  (it predates the SDK's `document` content-block type; the API itself
+  accepts it fine, no beta header needed). Revisit the cast if/when the SDK
+  is upgraded for other reasons.

@@ -7,6 +7,7 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  "application/pdf": "pdf",
 };
 
 let client: SupabaseClient | null = null;
@@ -26,20 +27,21 @@ function getClient(): SupabaseClient {
   return client;
 }
 
-export interface UploadedInvoiceImage {
+export interface UploadedFile {
   url: string;
   path: string;
 }
 
 /**
- * Uploads a scanned invoice image to Supabase Storage and returns its
- * public URL. The bucket is public-read (see .env.example) since the app
- * has no auth layer yet — revisit if auth is ever added.
+ * Uploads a scanned invoice page (image or single-page PDF) to Supabase
+ * Storage and returns its public URL. The bucket is public-read (see
+ * .env.example) since the app has no auth layer yet — revisit if auth is
+ * ever added.
  */
-export async function uploadInvoiceImage(
+export async function uploadInvoiceFile(
   buffer: Buffer,
   mimeType: string
-): Promise<UploadedInvoiceImage> {
+): Promise<UploadedFile> {
   const ext = MIME_EXTENSIONS[mimeType] ?? "bin";
   const datePrefix = new Date().toISOString().slice(0, 10);
   const path = `${datePrefix}/${randomUUID()}.${ext}`;

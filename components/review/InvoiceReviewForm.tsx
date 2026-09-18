@@ -160,12 +160,20 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto">
         {invoice.sourceImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={invoice.sourceImageUrl}
-            alt={`Scanned invoice ${invoice.invoiceNumber}`}
-            className="w-full rounded border object-contain"
-          />
+          invoice.sourceImageUrl.endsWith(".pdf") ? (
+            <iframe
+              src={invoice.sourceImageUrl}
+              title={`Scanned invoice ${invoice.invoiceNumber}`}
+              className="h-[calc(100vh-3rem)] w-full rounded border"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={invoice.sourceImageUrl}
+              alt={`Scanned invoice ${invoice.invoiceNumber}`}
+              className="w-full rounded border object-contain"
+            />
+          )
         ) : (
           <div className="flex h-64 items-center justify-center rounded border bg-gray-100 text-gray-500">
             No scanned image available

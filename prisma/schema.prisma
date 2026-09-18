@@ -82,6 +82,9 @@ model Invoice {
   sourcePage     Int     @map("source_page")
   sourceImageUrl String? @map("source_image_url")
 
+  processingJobId String?        @map("processing_job_id")
+  processingJob   ProcessingJob? @relation(fields: [processingJobId], references: [id])
+
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
   approvedAt DateTime? @map("approved_at")
@@ -131,6 +134,10 @@ model ExtractionAttempt {
   invoiceId String? @map("invoice_id")
   invoice   Invoice? @relation(fields: [invoiceId], references: [id])
 
+  processingJobId String?        @map("processing_job_id")
+  processingJob   ProcessingJob? @relation(fields: [processingJobId], references: [id])
+  sourcePage      Int?           @map("source_page") // set for batch pages, esp. failed ones with no Invoice row
+
   provider     String // e.g. "claude-vision"
   rawResponse  Json   @map("raw_response")
   succeeded    Boolean
@@ -169,6 +176,9 @@ model ProcessingJob {
 
   createdAt   DateTime  @default(now()) @map("created_at")
   completedAt DateTime? @map("completed_at")
+
+  invoices           Invoice[]
+  extractionAttempts ExtractionAttempt[]
 
   @@map("processing_jobs")
 }
