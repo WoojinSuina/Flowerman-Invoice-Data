@@ -73,12 +73,12 @@ export default async function DashboardPage() {
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
-          label="Total revenue"
-          value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
-        />
-        <StatTile
           label="Potential revenue (no returns)"
           value={formatCents(potentialRevenue._sum.calculatedTotalChargesCents ?? 0)}
+        />
+        <StatTile
+          label="Total revenue"
+          value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
         />
         <StatTile
           label="Needs review"
