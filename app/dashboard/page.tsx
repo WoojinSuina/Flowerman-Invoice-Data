@@ -32,9 +32,10 @@ function StatTile({
 }
 
 export default async function DashboardPage() {
-  const [totalInvoices, revenue, reviewCount, approvedCount] = await Promise.all([
+  const [totalInvoices, revenue, potentialRevenue, reviewCount, approvedCount] = await Promise.all([
     prisma.invoice.count(),
     prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true } }),
+    prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true } }),
     prisma.invoice.count({ where: { validationStatus: "REVIEW" } }),
     prisma.invoice.count({ where: { validationStatus: "APPROVED" } }),
   ]);
@@ -69,11 +70,15 @@ export default async function DashboardPage() {
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
           label="Total revenue"
           value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
+        />
+        <StatTile
+          label="Potential revenue (no returns)"
+          value={formatCents(potentialRevenue._sum.calculatedTotalChargesCents ?? 0)}
         />
         <StatTile
           label="Needs review"
