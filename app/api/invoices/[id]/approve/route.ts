@@ -5,8 +5,9 @@ export const runtime = "nodejs";
 
 const DEFAULT_ACTOR = "family";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const body = await req.json().catch(() => ({}) as { actor?: string });
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const body = await req.json().catch(() => (({}) as { actor?: string }));
   const actor = body.actor?.trim() || DEFAULT_ACTOR;
 
   const existing = await prisma.invoice.findUnique({

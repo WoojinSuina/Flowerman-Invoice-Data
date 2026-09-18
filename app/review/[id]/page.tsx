@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { InvoiceReviewForm } from "@/components/review/InvoiceReviewForm";
 
-export default async function ReviewDetailPage({ params }: { params: { id: string } }) {
+export default async function ReviewDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
     include: {

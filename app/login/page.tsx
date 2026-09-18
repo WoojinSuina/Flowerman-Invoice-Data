@@ -1,8 +1,9 @@
-export default function LoginPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; redirectTo?: string };
-}) {
+export default async function LoginPage(
+  props: {
+    searchParams: Promise<{ error?: string; redirectTo?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const redirectTo = searchParams.redirectTo ?? "/review";
 
   return (

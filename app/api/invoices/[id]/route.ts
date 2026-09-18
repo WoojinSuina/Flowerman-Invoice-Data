@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db/client";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
     include: {

@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 
-export default async function JobDetailPage({ params }: { params: { id: string } }) {
+export default async function JobDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const job = await prisma.processingJob.findUnique({
     where: { id: params.id },
     include: {

@@ -7,11 +7,12 @@ import type { ValidationStatus } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL")[] = ["REVIEW", "PASS", "APPROVED", "FAILED", "ALL"];
 
-export default async function ReviewListPage({
-  searchParams,
-}: {
-  searchParams: { status?: string };
-}) {
+export default async function ReviewListPage(
+  props: {
+    searchParams: Promise<{ status?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const status = searchParams.status ?? "REVIEW";
 
   const invoices = await prisma.invoice.findMany({

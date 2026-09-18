@@ -24,7 +24,8 @@ interface CorrectionsRequestBody {
   items: CorrectedItemInput[];
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = (await req.json()) as CorrectionsRequestBody;
 
   const existing = await prisma.invoice.findUnique({
