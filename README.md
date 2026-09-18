@@ -103,9 +103,19 @@ security patches. Notable side effects:
 - `lib/invoices/processInvoicePage.ts` now upserts a `Product` row per
   distinct product name (same pattern as the existing `Store` upsert) and
   links every `InvoiceItem.productId` — the `Product` table existed since
-  Phase 1 but was never populated until now. Historical rows created
-  before this change keep `productId: null` and simply won't appear in
-  the Products analytics below.
+  Phase 1 but was never populated until now. Existing rows were backfilled
+  one time by hand; any future gap (e.g. after a manual DB edit) would need
+  the same treatment — there's no ongoing migration for this, just the
+  going-forward upsert on every new upload.
+- Product name matching is exact-string, so an OCR misread (e.g. "TS ROSE"
+  read as "1S ROSE" on one invoice) creates a second `Product` row instead
+  of merging into the existing one — a known gap, not yet worth solving
+  given current volume.
+- Dashboard/Products aggregates include invoices of every
+  `validationStatus`, not just `APPROVED` — a REVIEW-status invoice with an
+  uncorrected AI misread (e.g. an "impossible quantity" flag) will skew
+  the numbers until a human corrects it. Worth revisiting (e.g. restrict
+  to `APPROVED` only) if this becomes noticeable at higher volume.
 - `app/dashboard` — KPI tiles (total invoices, total revenue, needs
   review, approved) plus Top Stores and Top Products tables. No charting
   library yet — tiles and tables only, by design; a natural place to add
