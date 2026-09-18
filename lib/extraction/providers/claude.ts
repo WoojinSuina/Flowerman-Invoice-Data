@@ -25,6 +25,13 @@ storeAddress is the address that follows it on the same line (e.g.
 "829 W MILLER RD GARLAND TX75041"). storeNumber comes from the separate
 "NO:" line above it.
 
+IMPORTANT — date format: the printed date (top right, near "INV NO:") is
+always MM/DD/YY — month first, then day, then a 2-digit year. For example
+"08/11/26" means August 11, 2026, NOT the year 2008. Never read the first
+number as a year. Convert the 2-digit year by prefixing "20" (so "26"
+becomes 2026) and output it as invoiceDate in "YYYY-MM-DD" format (e.g.
+"08/11/26" -> "2026-08-11").
+
 Return ONLY a JSON object with this exact shape, and nothing else — no markdown
 fences, no commentary:
 

@@ -7,6 +7,19 @@ import { NavBar } from "@/components/NavBar";
 // the page as static HTML at build time and it never reflects new data.
 export const dynamic = "force-dynamic";
 
+function getWeekStart(date: Date): Date {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay()); // back up to Sunday
+  return d;
+}
+
+function formatWeekLabel(weekStart: Date): string {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${fmt(weekStart)} – ${fmt(weekEnd)}`;
+}
+
 function StatTile({
   label,
   value,
@@ -64,6 +77,25 @@ export default async function DashboardPage() {
     where: { id: { in: topProductsRaw.map((p) => p.productId as string) } },
   });
   const productById = new Map(products.map((p) => [p.id, p]));
+
+  const allInvoiceDates = await prisma.invoice.findMany({
+    select: { invoiceDate: true, calculatedAmountDueCents: true },
+  });
+  const revenueByWeek = new Map<string, { weekStart: Date; revenueCents: number; count: number }>();
+  for (const inv of allInvoiceDates) {
+    const weekStart = getWeekStart(inv.invoiceDate);
+    const key = weekStart.toISOString();
+    const existing = revenueByWeek.get(key);
+    if (existing) {
+      existing.revenueCents += inv.calculatedAmountDueCents;
+      existing.count += 1;
+    } else {
+      revenueByWeek.set(key, { weekStart, revenueCents: inv.calculatedAmountDueCents, count: 1 });
+    }
+  }
+  const weeklyRevenue = [...revenueByWeek.values()].sort(
+    (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
+  );
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -161,6 +193,32 @@ export default async function DashboardPage() {
             </table>
           )}
         </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="mb-2 font-medium">Revenue by week</h2>
+        {weeklyRevenue.length === 0 ? (
+          <p className="text-sm text-gray-500">No data yet.</p>
+        ) : (
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">Week</th>
+                <th className="py-2 pr-4">Invoices</th>
+                <th className="py-2 pr-4">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weeklyRevenue.map((week) => (
+                <tr key={week.weekStart.toISOString()} className="border-b">
+                  <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
+                  <td className="py-2 pr-4 tabular-nums">{week.count}</td>
+                  <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </main>
   );

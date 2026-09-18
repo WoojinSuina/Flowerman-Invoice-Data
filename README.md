@@ -119,10 +119,11 @@ security patches. Notable side effects:
   uncorrected AI misread (e.g. an "impossible quantity" flag) will skew
   the numbers until a human corrects it. Worth revisiting (e.g. restrict
   to `APPROVED` only) if this becomes noticeable at higher volume.
-- `app/dashboard` — KPI tiles (total invoices, total revenue, needs
-  review, approved) plus Top Stores and Top Products tables. No charting
-  library yet — tiles and tables only, by design; a natural place to add
-  real charts later.
+- `app/dashboard` — KPI tiles (total invoices, potential revenue, total
+  revenue, needs review, approved), Top Stores and Top Products tables,
+  and a Revenue by week table (Sunday-start weeks, computed in JS from
+  `Invoice.invoiceDate` — no charting library yet, tiles and tables only,
+  by design; a natural place to add a real chart later).
 - `app/stores` / `app/stores/[id]` — store list with invoice
   count/revenue, and a per-store invoice history linking into
   `/review/[id]`.
@@ -223,6 +224,16 @@ against production `DATABASE_URL` as part of your deploy step.
   `MAX_FILE_BYTES` in `app/api/invoices/upload/route.ts` (currently 20MB).
 - **Currency**: everything is integer cents (`lib/money.ts`). Never compare
   floats for money.
+- **Extraction prompt fixes are cumulative, not automatically applied to
+  history**: `lib/extraction/providers/claude.ts`'s `EXTRACTION_PROMPT` has
+  needed real fixes as more invoices came through (e.g. distinguishing the
+  vendor's letterhead from the destination store's "NAME" line; the printed
+  date being MM/DD/YY, which the model initially misread as a 4-digit year
+  from the leading "08"). Each fix only affects future uploads — existing
+  bad rows need a one-off re-extraction pass from their `sourceImageUrl`,
+  the same way the store-name and date bugs were corrected by hand. There's
+  no general "re-run extraction on everything" tool; if this keeps
+  happening, building one would be worthwhile.
 - **Provider independence**: `lib/validation/engine.ts` imports nothing
   from `lib/extraction/`. Swapping AI providers means writing a new class
   satisfying `InvoiceExtractor` — validation logic is untouched.
