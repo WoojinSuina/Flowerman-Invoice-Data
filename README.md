@@ -109,8 +109,11 @@ security patches. Notable side effects:
   going-forward upsert on every new upload.
 - Product name matching is exact-string, so an OCR misread (e.g. "TS ROSE"
   read as "1S ROSE" on one invoice) creates a second `Product` row instead
-  of merging into the existing one — a known gap, not yet worth solving
-  given current volume.
+  of merging into the existing one. Rather than automatic fuzzy matching
+  (risks wrongly merging genuinely different products with similar names),
+  `app/api/products/merge/route.ts` + `MergeProductButton` on `/products`
+  let you manually merge a duplicate into the correct product — reassigns
+  every `InvoiceItem` and deletes the duplicate `Product` row.
 - Dashboard/Products aggregates include invoices of every
   `validationStatus`, not just `APPROVED` — a REVIEW-status invoice with an
   uncorrected AI misread (e.g. an "impossible quantity" flag) will skew
