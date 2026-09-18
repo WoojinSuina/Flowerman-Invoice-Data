@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_COOKIE = "fm_auth";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE)?.value;
   const authSecret = process.env.AUTH_SECRET;
 

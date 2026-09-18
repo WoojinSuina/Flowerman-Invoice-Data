@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { validateInvoice, type LineItemInput } from "@/lib/validation/engine";
 import { centsToDollars, dollarsToCents, formatCents } from "@/lib/money";
@@ -47,7 +47,7 @@ function MoneyInput({
 
 export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
   const router = useRouter();
-  const baseline = useRef(invoice);
+  const [baseline, setBaseline] = useState(invoice);
 
   const [totals, setTotals] = useState({
     totalChargesCents: invoice.totalChargesCents,
@@ -77,12 +77,12 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
 
   const changedFields = useMemo(() => {
     const changes: string[] = [];
-    const base = baseline.current;
-    if (totals.totalChargesCents !== base.totalChargesCents) changes.push("Total charges");
-    if (totals.totalCreditCents !== base.totalCreditCents) changes.push("Total credit");
-    if (totals.totalAmountDueCents !== base.totalAmountDueCents) changes.push("Total amount due");
+    if (totals.totalChargesCents !== baseline.totalChargesCents) changes.push("Total charges");
+    if (totals.totalCreditCents !== baseline.totalCreditCents) changes.push("Total credit");
+    if (totals.totalAmountDueCents !== baseline.totalAmountDueCents)
+      changes.push("Total amount due");
     for (const item of items) {
-      const original = base.items.find((i) => i.id === item.id);
+      const original = baseline.items.find((i) => i.id === item.id);
       if (!original) continue;
       if (item.productName !== original.productName) changes.push(`${original.productName}: name`);
       if (item.unitCostCents !== original.unitCostCents)
@@ -93,7 +93,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         changes.push(`${original.productName}: returned qty`);
     }
     return changes;
-  }, [totals, items]);
+  }, [totals, items, baseline]);
 
   function updateItem(id: string, patch: Partial<ReviewItem>) {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -125,13 +125,13 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
       }
       const data = await res.json();
       setStatus(data.invoice.validationStatus);
-      baseline.current = {
+      setBaseline({
         ...invoice,
         totalChargesCents: totals.totalChargesCents,
         totalCreditCents: totals.totalCreditCents,
         totalAmountDueCents: totals.totalAmountDueCents,
         items,
-      };
+      });
       router.refresh();
     } catch (err) {
       setError((err as Error).message);
