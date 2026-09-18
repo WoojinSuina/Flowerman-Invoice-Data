@@ -164,11 +164,23 @@ security patches. Notable side effects:
 ## What's built (Phase 5)
 
 - `app/recommendations` — one suggested delivery quantity per store per
-  product: the average `soldQuantity` across that store+product's invoice
-  history, rounded to the nearest whole unit. Transparent by design (the
-  README's own "not ML" goal for this phase) — average delivered and
-  average returned are shown alongside every suggestion so the math behind
-  the number is visible, not just the output.
+  product: an average `soldQuantity`, rounded to the nearest whole unit.
+  Transparent by design (the README's own "not ML" goal for this phase) —
+  average delivered and average returned are shown alongside every
+  suggestion so the math behind the number is visible, not just the
+  output.
+- **Seasonal, layered fallback, not a flat all-time average**: flower
+  demand swings by month (holidays, weather), so averaging across every
+  month ever recorded would flatten those swings out. For each store+
+  product, the average is computed from that store+product's invoices in
+  the *same calendar month in a prior year* if any exist; otherwise it
+  falls back to the last 3 invoices (any month) so the number still
+  tracks recent demand instead of a stale yearly blend. The "Based on"
+  column always names which basis was used (e.g. "September (2025)" vs.
+  "last 3 invoices"). Every pair falls back to the recent-invoices case
+  today — the app only has a few months of history, not a full prior
+  year yet — but the same-month branch activates automatically once
+  there's more than a year of data, with no code change needed.
 - Unlike the Dashboard/Products aggregates, this query **only** counts
   `PASS`/`APPROVED` invoices, excluding `REVIEW`. A recommendation directly
   drives how much product gets ordered, so letting an uncorrected AI
@@ -179,9 +191,9 @@ security patches. Notable side effects:
   filter was added). A `Math.max(0, ...)` clamp on the rounded result is
   kept as a second line of defense.
 - No history-length threshold — a store/product pair backed by a single
-  invoice gets a suggestion just like one backed by twenty; the "Based on
-  N invoices" column makes the confidence visible instead of hiding
-  low-data pairs.
+  invoice gets a suggestion just like one backed by twenty; the "Based on"
+  column makes the confidence (and which basis was used) visible instead
+  of hiding low-data pairs.
 
 ## What's NOT built yet (by design — see Phases below)
 

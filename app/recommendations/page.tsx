@@ -3,14 +3,23 @@ import { NavBar } from "@/components/NavBar";
 
 export const dynamic = "force-dynamic";
 
+const RECENT_WINDOW = 3;
+
+interface HistoryEntry {
+  invoiceDate: Date;
+  delivered: number;
+  returned: number;
+  sold: number;
+}
+
 interface ProductRecommendation {
   productId: string;
   productName: string;
-  invoiceCount: number;
+  recommendedQty: number;
   avgDelivered: number;
   avgReturned: number;
-  avgSold: number;
-  recommendedQty: number;
+  basisCount: number;
+  basisLabel: string;
 }
 
 interface StoreRecommendations {
@@ -20,7 +29,16 @@ interface StoreRecommendations {
   products: ProductRecommendation[];
 }
 
+function average(entries: HistoryEntry[], pick: (e: HistoryEntry) => number): number {
+  return entries.reduce((sum, e) => sum + pick(e), 0) / entries.length;
+}
+
 export default async function RecommendationsPage() {
+  const now = new Date();
+  const currentMonth = now.getUTCMonth();
+  const currentYear = now.getUTCFullYear();
+  const currentMonthLabel = now.toLocaleDateString(undefined, { month: "long", timeZone: "UTC" });
+
   const items = await prisma.invoiceItem.findMany({
     where: {
       productId: { not: null },
@@ -31,36 +49,33 @@ export default async function RecommendationsPage() {
       deliveredQuantity: true,
       returnedQuantity: true,
       soldQuantity: true,
-      invoice: { select: { storeId: true } },
+      invoice: { select: { storeId: true, invoiceDate: true } },
     },
   });
 
-  const agg = new Map<
-    string,
-    { storeId: string; productId: string; delivered: number; returned: number; sold: number; count: number }
-  >();
+  const history = new Map<string, { storeId: string; productId: string; entries: HistoryEntry[] }>();
   for (const item of items) {
     const key = `${item.invoice.storeId}|${item.productId}`;
-    const existing = agg.get(key);
+    const entry: HistoryEntry = {
+      invoiceDate: item.invoice.invoiceDate,
+      delivered: item.deliveredQuantity,
+      returned: item.returnedQuantity,
+      sold: item.soldQuantity,
+    };
+    const existing = history.get(key);
     if (existing) {
-      existing.delivered += item.deliveredQuantity;
-      existing.returned += item.returnedQuantity;
-      existing.sold += item.soldQuantity;
-      existing.count += 1;
+      existing.entries.push(entry);
     } else {
-      agg.set(key, {
+      history.set(key, {
         storeId: item.invoice.storeId,
         productId: item.productId as string,
-        delivered: item.deliveredQuantity,
-        returned: item.returnedQuantity,
-        sold: item.soldQuantity,
-        count: 1,
+        entries: [entry],
       });
     }
   }
 
-  const storeIds = [...new Set([...agg.values()].map((v) => v.storeId))];
-  const productIds = [...new Set([...agg.values()].map((v) => v.productId))];
+  const storeIds = [...new Set([...history.values()].map((v) => v.storeId))];
+  const productIds = [...new Set([...history.values()].map((v) => v.productId))];
 
   const [stores, products] = await Promise.all([
     prisma.store.findMany({ where: { id: { in: storeIds } } }),
@@ -70,28 +85,47 @@ export default async function RecommendationsPage() {
   const productById = new Map(products.map((p) => [p.id, p]));
 
   const byStore = new Map<string, StoreRecommendations>();
-  for (const entry of agg.values()) {
-    const store = storeById.get(entry.storeId);
-    const product = productById.get(entry.productId);
+  for (const { storeId, productId, entries } of history.values()) {
+    const store = storeById.get(storeId);
+    const product = productById.get(productId);
     if (!store || !product) continue;
 
-    const avgSold = entry.sold / entry.count;
+    const sorted = [...entries].sort((a, b) => b.invoiceDate.getTime() - a.invoiceDate.getTime());
+
+    const sameMonthPriorYears = sorted.filter(
+      (e) =>
+        e.invoiceDate.getUTCMonth() === currentMonth &&
+        e.invoiceDate.getUTCFullYear() < currentYear
+    );
+
+    let basis: HistoryEntry[];
+    let basisLabel: string;
+    if (sameMonthPriorYears.length > 0) {
+      basis = sameMonthPriorYears;
+      const years = [...new Set(basis.map((e) => e.invoiceDate.getUTCFullYear()))].sort();
+      basisLabel = `${currentMonthLabel} (${years.join(", ")})`;
+    } else {
+      basis = sorted.slice(0, RECENT_WINDOW);
+      basisLabel = `last ${basis.length} invoice${basis.length === 1 ? "" : "s"}`;
+    }
+
+    const avgSold = average(basis, (e) => e.sold);
     const recommendation: ProductRecommendation = {
-      productId: entry.productId,
+      productId,
       productName: product.name,
-      invoiceCount: entry.count,
-      avgDelivered: entry.delivered / entry.count,
-      avgReturned: entry.returned / entry.count,
-      avgSold,
       recommendedQty: Math.max(0, Math.round(avgSold)),
+      avgDelivered: average(basis, (e) => e.delivered),
+      avgReturned: average(basis, (e) => e.returned),
+      basisCount: basis.length,
+      basisLabel,
     };
 
-    const existing = byStore.get(entry.storeId);
+    const existing = byStore.get(storeId);
     if (existing) {
       existing.products.push(recommendation);
     } else {
-      byStore.set(entry.storeId, {
-        storeId: entry.storeId,
+      byStore.set(storeId, {
+        storeId,
         storeName: store.name,
         storeAddress: store.address,
         products: [recommendation],
@@ -111,11 +145,13 @@ export default async function RecommendationsPage() {
       <NavBar />
       <h1 className="mb-2 text-2xl font-semibold">Delivery Recommendations</h1>
       <p className="mb-6 text-sm text-gray-500">
-        Suggested quantity is the average sold quantity per invoice, rounded to
-        the nearest whole unit, across every passed or approved invoice recorded
-        for that store and product (invoices still needing review are excluded).
-        Delivered and returned averages are shown alongside so you can see the
-        history behind each number.
+        Suggested quantity is an average sold quantity, rounded to the nearest
+        whole unit, using only passed or approved invoices (invoices still
+        needing review are excluded). If a store and product has history from{" "}
+        {currentMonthLabel} in a prior year, that seasonal history is used;
+        otherwise it falls back to the last {RECENT_WINDOW} invoices so the
+        number tracks recent demand. The &quot;Based on&quot; column shows
+        which one was used.
       </p>
 
       {storeRecommendations.length === 0 ? (
@@ -155,9 +191,7 @@ export default async function RecommendationsPage() {
                       <td className="py-2 pr-4 tabular-nums text-gray-500">
                         {p.avgReturned.toFixed(1)}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums text-gray-500">
-                        {p.invoiceCount} invoice{p.invoiceCount === 1 ? "" : "s"}
-                      </td>
+                      <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
                     </tr>
                   ))}
                 </tbody>
