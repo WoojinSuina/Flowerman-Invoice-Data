@@ -8,28 +8,33 @@ import { uploadInvoiceFile } from "@/lib/storage/supabase";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
 
 /**
- * A store's identity is its address, not the printed store number — the
- * number is unreliable (OCR misreads), and different real locations of the
- * same chain can otherwise collide. Falls back to matching by number only
- * when no address was extracted at all, so a page with no readable address
- * doesn't spawn a duplicate store on every upload.
+ * A store's identity is (name, address) together, not the printed store
+ * number — the number is unreliable (OCR misreads), and different real
+ * locations of the same chain can otherwise collide. Address alone isn't
+ * always enough either: some invoices print no separate street address,
+ * just a compact "brand + road + town" description, and the name/address
+ * split can leave two different real stores with the same short trailing
+ * address (e.g. both ending up with just the town name). Falls back to
+ * matching by number only when no address was extracted at all, so a page
+ * with no readable address doesn't spawn a duplicate store on every upload.
  */
 async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   const address = extracted.storeAddress?.trim() || null;
+  const name = extracted.storeName;
 
   const existing = address
-    ? await prisma.store.findUnique({ where: { address } })
+    ? await prisma.store.findUnique({ where: { name_address: { name, address } } })
     : await prisma.store.findFirst({ where: { storeNumber: extracted.storeNumber } });
 
   if (existing) {
     return prisma.store.update({
       where: { id: existing.id },
-      data: { name: extracted.storeName, address: address ?? existing.address, storeNumber: extracted.storeNumber },
+      data: { name, address: address ?? existing.address, storeNumber: extracted.storeNumber },
     });
   }
 
   return prisma.store.create({
-    data: { storeNumber: extracted.storeNumber, name: extracted.storeName, address },
+    data: { storeNumber: extracted.storeNumber, name, address },
   });
 }
 

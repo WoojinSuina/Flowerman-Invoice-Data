@@ -124,15 +124,28 @@ security patches. Notable side effects:
   and a Revenue by week table (Sunday-start weeks, computed in JS from
   `Invoice.invoiceDate` — no charting library yet, tiles and tables only,
   by design; a natural place to add a real chart later).
-- **A store's identity is its address, not its printed store number.**
-  `resolveStore()` in `lib/invoices/processInvoicePage.ts` matches an
-  incoming invoice to an existing `Store` by `address` first (falling back
-  to `storeNumber` only when no address was extracted at all). The printed
-  number is unreliable — it's just informational now, not the dedup key —
-  and different real locations of the same chain (e.g. 18 different Shell
-  stations across the invoices actually processed) would otherwise be
-  impossible to distinguish if grouped by name/number alone. `Store.address`
-  is `@unique`; `storeNumber` is not.
+- **A store's identity is (name, address) together, not its printed store
+  number.** `resolveStore()` in `lib/invoices/processInvoicePage.ts` matches
+  an incoming invoice to an existing `Store` by the `(name, address)`
+  compound key first (falling back to `storeNumber` only when no address
+  was extracted at all). The printed number is unreliable — it's just
+  informational now, not the dedup key — and different real locations of
+  the same chain (e.g. 18 different Shell stations across the invoices
+  actually processed) would otherwise be impossible to distinguish if
+  grouped by name/number alone. Address alone isn't always enough either:
+  some invoices print no separate street address, just a compact
+  "brand + road + town" description, and two different real stores can end
+  up with the same short trailing address (e.g. both just the town name) —
+  including name in the key fixes that. `@@unique([name, address])` on
+  `Store`; `storeNumber` is not unique.
+- **A one-time repair was needed** after this fix shipped: 44 of the 126
+  invoices that existed before it were still attached to the wrong store
+  (merged under a shared, unreliable store number from before the fix).
+  Repaired by re-resolving every invoice against its own already-recorded
+  address (free — no API calls) except 6 whose recorded address was the
+  vendor's (from before the separate vendor-vs-store prompt fix), which
+  needed one fresh re-extraction each. There's no ongoing tool for this —
+  it was a one-off migration for existing bad data, run by hand.
 - Same OCR-duplicate risk as products: `app/api/stores/merge/route.ts` +
   `MergeStoreButton` on `/stores` let you manually merge two store rows
   that turn out to be the same real location under slightly different

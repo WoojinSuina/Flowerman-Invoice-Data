@@ -31,15 +31,22 @@ model Store {
   id          String   @id @default(uuid())
   // Not unique: the printed store number is unreliable (OCR misreads),
   // and multiple genuinely different locations of the same chain can
-  // share numbering schemes. Address is the real identity — see
-  // lib/invoices/processInvoicePage.ts's resolveStore().
+  // share numbering schemes. (name, address) together are the real
+  // identity — see lib/invoices/processInvoicePage.ts's resolveStore().
+  // Address alone isn't always enough: some invoices print no separate
+  // street address, just a compact "brand + road + town" description
+  // (e.g. "EXXON BELT LINE WILLMER" vs "SHELL I-45/BELTLINE WILLMER"),
+  // and the name/address split can leave two different real stores
+  // both with the same short trailing address ("WILLMER").
   storeNumber String   @map("store_number")
   name        String
-  address     String?  @unique
+  address     String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   invoices Invoice[]
+
+  @@unique([name, address])
 
   @@map("stores")
 }
