@@ -16,7 +16,8 @@ function getWeekStart(date: Date): Date {
 function formatWeekLabel(weekStart: Date): string {
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
-  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
   return `${fmt(weekStart)} – ${fmt(weekEnd)}`;
 }
 
