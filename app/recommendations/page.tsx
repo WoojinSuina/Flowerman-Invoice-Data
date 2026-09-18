@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { NavBar } from "@/components/NavBar";
 
@@ -33,7 +34,10 @@ function average(entries: HistoryEntry[], pick: (e: HistoryEntry) => number): nu
   return entries.reduce((sum, e) => sum + pick(e), 0) / entries.length;
 }
 
-export default async function RecommendationsPage() {
+export default async function RecommendationsPage(props: {
+  searchParams: Promise<{ store?: string }>;
+}) {
+  const searchParams = await props.searchParams;
   const now = new Date();
   const currentMonth = now.getUTCMonth();
   const currentYear = now.getUTCFullYear();
@@ -140,8 +144,14 @@ export default async function RecommendationsPage() {
     }))
     .sort((a, b) => a.storeName.localeCompare(b.storeName));
 
+  const selectedStoreId =
+    searchParams.store && storeRecommendations.some((s) => s.storeId === searchParams.store)
+      ? searchParams.store
+      : storeRecommendations[0]?.storeId;
+  const selectedStore = storeRecommendations.find((s) => s.storeId === selectedStoreId);
+
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <main className="mx-auto max-w-6xl p-6">
       <NavBar />
       <h1 className="mb-2 text-2xl font-semibold">Delivery Recommendations</h1>
       <p className="mb-6 text-sm text-gray-500">
@@ -157,14 +167,44 @@ export default async function RecommendationsPage() {
       {storeRecommendations.length === 0 ? (
         <p className="text-sm text-gray-500">No data yet.</p>
       ) : (
-        <div className="space-y-8">
-          {storeRecommendations.map((store) => (
-            <div key={store.storeId}>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[16rem_1fr]">
+          <nav className="md:h-[calc(100vh-14rem)] md:overflow-auto md:border-r md:pr-4">
+            <ul className="space-y-1">
+              {storeRecommendations.map((store) => (
+                <li key={store.storeId}>
+                  <Link
+                    href={`/recommendations?store=${store.storeId}`}
+                    className={
+                      store.storeId === selectedStoreId
+                        ? "block rounded bg-gray-900 px-2 py-1 text-sm text-white"
+                        : "block rounded px-2 py-1 text-sm text-blue-600 hover:bg-gray-50"
+                    }
+                  >
+                    {store.storeName}
+                    {store.storeAddress && (
+                      <div
+                        className={
+                          store.storeId === selectedStoreId
+                            ? "text-xs text-gray-300"
+                            : "text-xs text-gray-500"
+                        }
+                      >
+                        {store.storeAddress}
+                      </div>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {selectedStore && (
+            <div>
               <h2 className="mb-2 font-medium">
-                {store.storeName}
-                {store.storeAddress && (
+                {selectedStore.storeName}
+                {selectedStore.storeAddress && (
                   <span className="ml-2 text-xs font-normal text-gray-500">
-                    {store.storeAddress}
+                    {selectedStore.storeAddress}
                   </span>
                 )}
               </h2>
@@ -179,7 +219,7 @@ export default async function RecommendationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {store.products.map((p) => (
+                  {selectedStore.products.map((p) => (
                     <tr key={p.productId} className="border-b">
                       <td className="py-2 pr-4">{p.productName}</td>
                       <td className="py-2 pr-4 tabular-nums font-semibold">
@@ -197,7 +237,7 @@ export default async function RecommendationsPage() {
                 </tbody>
               </table>
             </div>
-          ))}
+          )}
         </div>
       )}
     </main>
