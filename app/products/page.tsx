@@ -27,6 +27,21 @@ export default async function ProductsListPage() {
   });
   const productById = new Map(products.map((p) => [p.id, p]));
 
+  // Profit = retail markup (retail price minus vendor cost) on units sold —
+  // a per-row computation, not something groupBy's _sum can express.
+  const items = await prisma.invoiceItem.findMany({
+    where: { productId: { not: null } },
+    select: { productId: true, soldQuantity: true, retailPriceCents: true, unitCostCents: true },
+  });
+  const profitCentsByProductId = new Map<string, number>();
+  for (const item of items) {
+    const profit = item.soldQuantity * (item.retailPriceCents - item.unitCostCents);
+    profitCentsByProductId.set(
+      item.productId as string,
+      (profitCentsByProductId.get(item.productId as string) ?? 0) + profit
+    );
+  }
+
   return (
     <main className="mx-auto max-w-5xl p-6">
       <NavBar />
@@ -43,6 +58,7 @@ export default async function ProductsListPage() {
               <th className="py-2 pr-4">Product</th>
               <th className="py-2 pr-4">Qty sold</th>
               <th className="py-2 pr-4">Revenue</th>
+              <th className="py-2 pr-4">Profit</th>
               <th className="py-2 pr-4">Times seen</th>
               <th className="py-2 pr-4">Avg. confidence</th>
               <th className="py-2 pr-4">Duplicate?</th>
@@ -61,6 +77,11 @@ export default async function ProductsListPage() {
                   <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
                   <td className="py-2 pr-4 tabular-nums">
                     {formatCents(row._sum.netSoldAmountCents ?? 0)}
+                  </td>
+                  <td className="py-2 pr-4 tabular-nums">
+                    {formatCents(
+                      row.productId ? (profitCentsByProductId.get(row.productId) ?? 0) : 0
+                    )}
                   </td>
                   <td className="py-2 pr-4 tabular-nums">{row._count}</td>
                   <td className="py-2 pr-4 tabular-nums">

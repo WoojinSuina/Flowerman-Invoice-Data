@@ -32,12 +32,33 @@ function StatTile({
 }
 
 export default async function DashboardPage() {
-  const [totalInvoices, revenue, reviewCount, approvedCount] = await Promise.all([
+  const [totalInvoices, revenue, reviewCount, approvedCount, allItems] = await Promise.all([
     prisma.invoice.count(),
     prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true } }),
     prisma.invoice.count({ where: { validationStatus: "REVIEW" } }),
     prisma.invoice.count({ where: { validationStatus: "APPROVED" } }),
+    prisma.invoiceItem.findMany({
+      select: { productId: true, soldQuantity: true, retailPriceCents: true, unitCostCents: true },
+    }),
   ]);
+
+  // Profit = the store's retail markup (what they sell for minus what they
+  // pay the vendor) on units actually sold. There's no field for the
+  // vendor's own wholesale cost, so this is the only profit the data
+  // supports — not a Prisma-aggregatable sum, since it's a per-row
+  // computation, so it's reduced here instead.
+  const profitCentsByProductId = new Map<string, number>();
+  let totalProfitCents = 0;
+  for (const item of allItems) {
+    const profit = item.soldQuantity * (item.retailPriceCents - item.unitCostCents);
+    totalProfitCents += profit;
+    if (item.productId) {
+      profitCentsByProductId.set(
+        item.productId,
+        (profitCentsByProductId.get(item.productId) ?? 0) + profit
+      );
+    }
+  }
 
   const topStoresRaw = await prisma.invoice.groupBy({
     by: ["storeId"],
@@ -69,12 +90,13 @@ export default async function DashboardPage() {
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
           label="Total revenue"
           value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
         />
+        <StatTile label="Total profit" value={formatCents(totalProfitCents)} />
         <StatTile
           label="Needs review"
           value={reviewCount.toLocaleString()}
@@ -137,11 +159,15 @@ export default async function DashboardPage() {
                   <th className="py-2 pr-4">Product</th>
                   <th className="py-2 pr-4">Qty sold</th>
                   <th className="py-2 pr-4">Revenue</th>
+                  <th className="py-2 pr-4">Profit</th>
                 </tr>
               </thead>
               <tbody>
                 {topProductsRaw.map((row) => {
                   const product = row.productId ? productById.get(row.productId) : undefined;
+                  const profitCents = row.productId
+                    ? (profitCentsByProductId.get(row.productId) ?? 0)
+                    : 0;
                   return (
                     <tr key={row.productId} className="border-b">
                       <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
@@ -149,6 +175,7 @@ export default async function DashboardPage() {
                       <td className="py-2 pr-4 tabular-nums">
                         {formatCents(row._sum.netSoldAmountCents ?? 0)}
                       </td>
+                      <td className="py-2 pr-4 tabular-nums">{formatCents(profitCents)}</td>
                     </tr>
                   );
                 })}
