@@ -72,19 +72,30 @@ export class ClaudeInvoiceExtractor implements InvoiceExtractor {
           },
         };
 
-    const response = await this.client.messages.create({
-      model: "claude-sonnet-4-6",
+    // This SDK version (0.32.x) predates both the `document` content block
+    // and the `thinking` param in its bundled types, though the API itself
+    // accepts them fine (PDF input and thinking control, no beta header
+    // needed). Build the request loosely typed and cast once at the call
+    // site rather than bumping the SDK's major version for a type-only gap.
+    const requestBody = {
+      model: "claude-sonnet-5",
       max_tokens: 2000,
+      // Sonnet 5 runs adaptive thinking by default (unlike sonnet-4-6, where
+      // thinking was off unless enabled). This is a plain structured-JSON
+      // extraction task with no need for reasoning, so disable it explicitly
+      // to keep cost/latency equivalent to before.
+      thinking: { type: "disabled" },
       messages: [
         {
           role: "user",
-          // The `document` block above isn't in this SDK version's (0.32.x)
-          // bundled types yet, though the API itself accepts it (PDF input,
-          // no beta header). Cast narrowly rather than bumping the SDK.
-          content: [documentOrImageBlock, { type: "text", text: EXTRACTION_PROMPT }] as unknown as Anthropic.MessageCreateParams["messages"][number]["content"],
+          content: [documentOrImageBlock, { type: "text", text: EXTRACTION_PROMPT }],
         },
       ],
-    });
+    };
+
+    const response = await this.client.messages.create(
+      requestBody as unknown as Anthropic.MessageCreateParamsNonStreaming
+    );
 
     const textBlock = response.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") {
