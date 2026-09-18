@@ -100,8 +100,8 @@ export default async function DashboardPage(props: {
     prisma.invoice.count({ where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
-    prisma.invoice.count({ where: { validationStatus: "REVIEW" } }),
-    prisma.invoice.count({ where: { validationStatus: "APPROVED" } }),
+    prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
+    prisma.invoice.count({ where: { ...thisMonth, validationStatus: "APPROVED" } }),
   ]);
 
   const topStoresRaw = await prisma.invoice.groupBy({
