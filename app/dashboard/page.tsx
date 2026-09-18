@@ -158,7 +158,7 @@ export default async function DashboardPage(props: {
         <MonthSelect value={monthParam(monthStart)} options={monthOptions} />
       </div>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
           label="Potential revenue (no returns)"
