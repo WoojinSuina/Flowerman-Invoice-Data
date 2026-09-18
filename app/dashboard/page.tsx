@@ -132,8 +132,7 @@ export default async function DashboardPage(props: {
   }
   const topStoresRaw = [...storeAgg.entries()]
     .map(([storeId, agg]) => ({ storeId, ...agg }))
-    .sort((a, b) => b.qtySold - a.qtySold)
-    .slice(0, 5);
+    .sort((a, b) => b.qtySold - a.qtySold);
   const stores = await prisma.store.findMany({
     where: { id: { in: topStoresRaw.map((s) => s.storeId) } },
   });
@@ -200,7 +199,7 @@ export default async function DashboardPage(props: {
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
-          <h2 className="mb-2 font-medium">Top stores</h2>
+          <h2 className="mb-2 font-medium">Stores (by qty sold)</h2>
           {topStoresRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
