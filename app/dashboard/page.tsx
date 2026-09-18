@@ -7,6 +7,25 @@ import { NavBar } from "@/components/NavBar";
 // the page as static HTML at build time and it never reflects new data.
 export const dynamic = "force-dynamic";
 
+function parseMonthParam(month: string | undefined): Date {
+  if (month) {
+    const match = month.match(/^(\d{4})-(\d{2})$/);
+    if (match) {
+      const year = Number(match[1]);
+      const monthIndex = Number(match[2]) - 1;
+      if (monthIndex >= 0 && monthIndex <= 11) {
+        return new Date(Date.UTC(year, monthIndex, 1));
+      }
+    }
+  }
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+function monthParam(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 function getWeekStart(date: Date): Date {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   d.setUTCDate(d.getUTCDate() - d.getUTCDay()); // back up to Sunday
@@ -45,10 +64,13 @@ function StatTile({
   );
 }
 
-export default async function DashboardPage() {
-  const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+export default async function DashboardPage(props: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  const searchParams = await props.searchParams;
+  const monthStart = parseMonthParam(searchParams.month);
+  const nextMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
+  const prevMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 1, 1));
   const monthLabel = monthStart.toLocaleDateString(undefined, {
     month: "long",
     year: "numeric",
@@ -57,7 +79,7 @@ export default async function DashboardPage() {
   const thisMonth = { invoiceDate: { gte: monthStart, lt: nextMonthStart } };
 
   const [totalInvoices, revenue, potentialRevenue, reviewCount, approvedCount] = await Promise.all([
-    prisma.invoice.count(),
+    prisma.invoice.count({ where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
     prisma.invoice.count({ where: { validationStatus: "REVIEW" } }),
@@ -113,8 +135,27 @@ export default async function DashboardPage() {
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
 
+      <div className="mb-4 flex items-center gap-4">
+        <Link
+          href={`/dashboard?month=${monthParam(prevMonthStart)}`}
+          className="text-sm text-blue-600 underline"
+        >
+          ← Previous month
+        </Link>
+        <span className="font-medium">{monthLabel}</span>
+        <Link
+          href={`/dashboard?month=${monthParam(nextMonthStart)}`}
+          className="text-sm text-blue-600 underline"
+        >
+          Next month →
+        </Link>
+      </div>
+
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
-        <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
+        <StatTile
+          label={`Total invoices, ${monthLabel}`}
+          value={totalInvoices.toLocaleString()}
+        />
         <StatTile
           label={`Potential revenue, ${monthLabel} (no returns)`}
           value={formatCents(potentialRevenue._sum.calculatedTotalChargesCents ?? 0)}
