@@ -144,7 +144,7 @@ export default async function DashboardPage(props: {
         >
           ← Previous month
         </Link>
-        <span className="font-medium">{monthLabel}</span>
+        <span className="text-lg font-bold">{monthLabel}</span>
         <Link
           href={`/dashboard?month=${monthParam(nextMonthStart)}`}
           className="text-sm text-blue-600 underline"
@@ -154,16 +154,13 @@ export default async function DashboardPage(props: {
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
+        <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
-          label={`Total invoices, ${monthLabel}`}
-          value={totalInvoices.toLocaleString()}
-        />
-        <StatTile
-          label={`Potential revenue, ${monthLabel} (no returns)`}
+          label="Potential revenue (no returns)"
           value={formatCents(potentialRevenue._sum.calculatedTotalChargesCents ?? 0)}
         />
         <StatTile
-          label={`Revenue, ${monthLabel}`}
+          label="Revenue"
           value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
         />
         <StatTile
@@ -180,7 +177,7 @@ export default async function DashboardPage(props: {
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
-          <h2 className="mb-2 font-medium">Top stores, {monthLabel}</h2>
+          <h2 className="mb-2 font-medium">Top stores</h2>
           {topStoresRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
@@ -218,7 +215,7 @@ export default async function DashboardPage(props: {
         </div>
 
         <div>
-          <h2 className="mb-2 font-medium">Top products, {monthLabel}</h2>
+          <h2 className="mb-2 font-medium">Top products</h2>
           {topProductsRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
@@ -250,7 +247,7 @@ export default async function DashboardPage(props: {
       </div>
 
       <div className="mt-8">
-        <h2 className="mb-2 font-medium">Revenue by week, {monthLabel}</h2>
+        <h2 className="mb-2 font-medium">Revenue by week</h2>
         {weeklyRevenue.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet.</p>
         ) : (
