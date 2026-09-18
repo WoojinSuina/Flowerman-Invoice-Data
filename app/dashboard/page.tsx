@@ -106,6 +106,9 @@ export default async function DashboardPage() {
                         <Link href={`/stores/${row.storeId}`} className="text-blue-600 underline">
                           {store?.name ?? row.storeId}
                         </Link>
+                        {store?.address && (
+                          <div className="text-xs text-gray-500">{store.address}</div>
+                        )}
                       </td>
                       <td className="py-2 pr-4 tabular-nums">{row._count}</td>
                       <td className="py-2 pr-4 tabular-nums">

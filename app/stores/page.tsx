@@ -40,6 +40,9 @@ export default async function StoresListPage() {
                     <Link href={`/stores/${store.id}`} className="text-blue-600 underline">
                       {store.name}
                     </Link>
+                    {store.address && (
+                      <div className="text-xs text-gray-500">{store.address}</div>
+                    )}
                   </td>
                   <td className="py-2 pr-4">{store.storeNumber}</td>
                   <td className="py-2 pr-4 tabular-nums">{agg?._count ?? 0}</td>

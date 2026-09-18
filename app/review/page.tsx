@@ -61,7 +61,12 @@ export default async function ReviewListPage(
                     {invoice.invoiceNumber}
                   </Link>
                 </td>
-                <td className="py-2 pr-4">{invoice.store.name}</td>
+                <td className="py-2 pr-4">
+                  {invoice.store.name}
+                  {invoice.store.address && (
+                    <div className="text-xs text-gray-500">{invoice.store.address}</div>
+                  )}
+                </td>
                 <td className="py-2 pr-4">
                   {new Date(invoice.invoiceDate).toLocaleDateString()}
                 </td>
