@@ -3,6 +3,10 @@ import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MergeProductButton } from "@/components/products/MergeProductButton";
 
+// Reads live from Prisma on every request — without this, Next prerenders
+// the page as static HTML at build time and it never reflects new data.
+export const dynamic = "force-dynamic";
+
 export default async function ProductsListPage() {
   const aggregates = await prisma.invoiceItem.groupBy({
     by: ["productId"],

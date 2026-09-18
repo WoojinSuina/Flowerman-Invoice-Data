@@ -3,6 +3,10 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 
+// Reads live from Prisma on every request — without this, Next prerenders
+// the page as static HTML at build time and it never reflects new data.
+export const dynamic = "force-dynamic";
+
 export default async function StoresListPage() {
   const [stores, aggregates] = await Promise.all([
     prisma.store.findMany({ orderBy: { name: "asc" } }),
