@@ -98,16 +98,38 @@ security patches. Notable side effects:
   since most models' training data — commit them as-is when they change,
   per their own header comment, rather than deleting them.
 
+## What's built (Phase 4)
+
+- `lib/invoices/processInvoicePage.ts` now upserts a `Product` row per
+  distinct product name (same pattern as the existing `Store` upsert) and
+  links every `InvoiceItem.productId` — the `Product` table existed since
+  Phase 1 but was never populated until now. Historical rows created
+  before this change keep `productId: null` and simply won't appear in
+  the Products analytics below.
+- `app/dashboard` — KPI tiles (total invoices, total revenue, needs
+  review, approved) plus Top Stores and Top Products tables. No charting
+  library yet — tiles and tables only, by design; a natural place to add
+  real charts later.
+- `app/stores` / `app/stores/[id]` — store list with invoice
+  count/revenue, and a per-store invoice history linking into
+  `/review/[id]`.
+- `app/products` — per-product totals (quantity sold, revenue, times
+  seen, average AI confidence) — the confidence column doubles as a
+  quality signal for which products the model struggles to read.
+- `components/NavBar.tsx` — shared nav (Dashboard/Review/Jobs/Stores/
+  Products + logout), replacing the ad-hoc header links each page used
+  to hand-roll. `/` now redirects straight to `/dashboard`.
+
 ## What's NOT built yet (by design — see Phases below)
 
-- Dashboard, Stores, Products analytics screens (Phase 4)
 - Delivery recommendations (Phase 5)
 - Adding/removing line items during review (corrections only edit existing
   items by id)
 - Async/polled batch processing — uploads are currently synchronous (see
   "Architectural notes" below for why, and when to revisit)
+- Charts on the Dashboard — currently KPI tiles + tables only
 
-The next milestone is Phase 4 (Dashboard, Stores, Products analytics).
+The next milestone is Phase 5 (delivery recommendations).
 
 ## Setup
 

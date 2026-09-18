@@ -84,6 +84,19 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       },
     });
 
+    const productIdByName = new Map(
+      await Promise.all(
+        [...new Set(result.items.map((item) => item.productName))].map(async (name) => {
+          const product = await prisma.product.upsert({
+            where: { name },
+            update: {},
+            create: { name },
+          });
+          return [name, product.id] as const;
+        })
+      )
+    );
+
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber: extracted.invoiceNumber,
@@ -106,6 +119,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         items: {
           create: result.items.map((item, index) => ({
             productName: item.productName,
+            productId: productIdByName.get(item.productName) ?? null,
             lineNumber: index,
             retailPriceCents: dollarsToCents(
               extracted.products.find((p) => p.productName === item.productName)?.retailPrice ?? 0
