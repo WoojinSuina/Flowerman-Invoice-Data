@@ -28,6 +28,7 @@ interface StoreRecommendations {
   storeName: string;
   storeAddress: string | null;
   products: ProductRecommendation[];
+  reviewCount: number;
 }
 
 function average(entries: HistoryEntry[], pick: (e: HistoryEntry) => number): number {
@@ -78,7 +79,19 @@ export default async function RecommendationsPage(props: {
     }
   }
 
-  const storeIds = [...new Set([...history.values()].map((v) => v.storeId))];
+  const reviewCountsRaw = await prisma.invoice.groupBy({
+    by: ["storeId"],
+    where: { validationStatus: "REVIEW" },
+    _count: true,
+  });
+  const reviewCountByStore = new Map(reviewCountsRaw.map((r) => [r.storeId, r._count]));
+
+  const storeIds = [
+    ...new Set([
+      ...[...history.values()].map((v) => v.storeId),
+      ...reviewCountsRaw.map((r) => r.storeId),
+    ]),
+  ];
   const productIds = [...new Set([...history.values()].map((v) => v.productId))];
 
   const [stores, products] = await Promise.all([
@@ -133,8 +146,25 @@ export default async function RecommendationsPage(props: {
         storeName: store.name,
         storeAddress: store.address,
         products: [recommendation],
+        reviewCount: reviewCountByStore.get(storeId) ?? 0,
       });
     }
+  }
+
+  // Stores whose only invoices are still in REVIEW have no PASS/APPROVED
+  // history to base a recommendation on, so they'd otherwise be invisible
+  // on this page even though they need attention.
+  for (const [storeId, count] of reviewCountByStore) {
+    if (byStore.has(storeId)) continue;
+    const store = storeById.get(storeId);
+    if (!store) continue;
+    byStore.set(storeId, {
+      storeId,
+      storeName: store.name,
+      storeAddress: store.address,
+      products: [],
+      reviewCount: count,
+    });
   }
 
   const storeRecommendations = [...byStore.values()]
@@ -180,7 +210,14 @@ export default async function RecommendationsPage(props: {
                         : "block rounded px-2 py-1 text-sm text-blue-600 hover:bg-gray-50"
                     }
                   >
-                    {store.storeName}
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{store.storeName}</span>
+                      {store.reviewCount > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          {store.reviewCount} need review
+                        </span>
+                      )}
+                    </div>
                     {store.storeAddress && (
                       <div
                         className={
@@ -200,42 +237,62 @@ export default async function RecommendationsPage(props: {
 
           {selectedStore && (
             <div>
-              <h2 className="mb-2 font-medium">
-                {selectedStore.storeName}
-                {selectedStore.storeAddress && (
-                  <span className="ml-2 text-xs font-normal text-gray-500">
-                    {selectedStore.storeAddress}
-                  </span>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="font-medium">
+                  {selectedStore.storeName}
+                  {selectedStore.storeAddress && (
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      {selectedStore.storeAddress}
+                    </span>
+                  )}
+                </h2>
+                {selectedStore.reviewCount > 0 && (
+                  <Link
+                    href={`/stores/${selectedStore.storeId}`}
+                    className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200"
+                  >
+                    {selectedStore.reviewCount} invoice
+                    {selectedStore.reviewCount === 1 ? "" : "s"} need review
+                  </Link>
                 )}
-              </h2>
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b text-left text-gray-500">
-                    <th className="py-2 pr-4">Product</th>
-                    <th className="py-2 pr-4">Suggested qty</th>
-                    <th className="py-2 pr-4">Avg delivered</th>
-                    <th className="py-2 pr-4">Avg returned</th>
-                    <th className="py-2 pr-4">Based on</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedStore.products.map((p) => (
-                    <tr key={p.productId} className="border-b">
-                      <td className="py-2 pr-4">{p.productName}</td>
-                      <td className="py-2 pr-4 tabular-nums font-semibold">
-                        {p.recommendedQty}
-                      </td>
-                      <td className="py-2 pr-4 tabular-nums text-gray-500">
-                        {p.avgDelivered.toFixed(1)}
-                      </td>
-                      <td className="py-2 pr-4 tabular-nums text-gray-500">
-                        {p.avgReturned.toFixed(1)}
-                      </td>
-                      <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
+              </div>
+
+              {selectedStore.products.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No approved history yet for this store — its only invoice
+                  {selectedStore.reviewCount === 1 ? " is" : "s are"} still awaiting
+                  review, so there&apos;s nothing to base a recommendation on.
+                </p>
+              ) : (
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500">
+                      <th className="py-2 pr-4">Product</th>
+                      <th className="py-2 pr-4">Suggested qty</th>
+                      <th className="py-2 pr-4">Avg delivered</th>
+                      <th className="py-2 pr-4">Avg returned</th>
+                      <th className="py-2 pr-4">Based on</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {selectedStore.products.map((p) => (
+                      <tr key={p.productId} className="border-b">
+                        <td className="py-2 pr-4">{p.productName}</td>
+                        <td className="py-2 pr-4 tabular-nums font-semibold">
+                          {p.recommendedQty}
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums text-gray-500">
+                          {p.avgDelivered.toFixed(1)}
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums text-gray-500">
+                          {p.avgReturned.toFixed(1)}
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
         </div>

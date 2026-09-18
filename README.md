@@ -202,6 +202,15 @@ security patches. Notable side effects:
   invoice gets a suggestion just like one backed by twenty; the "Based on"
   column makes the confidence (and which basis was used) visible instead
   of hiding low-data pairs.
+- **Stores that only have REVIEW invoices are still listed**, not hidden.
+  Since the recommendation query excludes REVIEW invoices, a store whose
+  only invoice needs review would otherwise have zero data and vanish from
+  the page entirely — easy to mistake for "this store has no history" when
+  it actually means "go review that invoice first." The sidebar shows a
+  "N need review" badge on any store with pending REVIEW invoices (whether
+  or not it also has recommendation data), linking to `/stores/[id]`; a
+  store with only REVIEW invoices shows that badge plus an explanation
+  instead of an empty table.
 
 ## What's NOT built yet (by design — see Phases below)
 
