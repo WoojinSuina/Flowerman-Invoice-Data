@@ -29,9 +29,13 @@ enum JobStatus {
 
 model Store {
   id          String   @id @default(uuid())
-  storeNumber String   @unique @map("store_number")
+  // Not unique: the printed store number is unreliable (OCR misreads),
+  // and multiple genuinely different locations of the same chain can
+  // share numbering schemes. Address is the real identity — see
+  // lib/invoices/processInvoicePage.ts's resolveStore().
+  storeNumber String   @map("store_number")
   name        String
-  address     String?
+  address     String?  @unique
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
+import { MergeStoreButton } from "@/components/stores/MergeStoreButton";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -33,11 +34,15 @@ export default async function StoresListPage() {
               <th className="py-2 pr-4">Store #</th>
               <th className="py-2 pr-4">Invoices</th>
               <th className="py-2 pr-4">Revenue</th>
+              <th className="py-2 pr-4">Duplicate?</th>
             </tr>
           </thead>
           <tbody>
             {stores.map((store) => {
               const agg = aggregateByStoreId.get(store.id);
+              const otherStores = stores
+                .filter((s) => s.id !== store.id)
+                .map((s) => ({ id: s.id, name: s.name, address: s.address }));
               return (
                 <tr key={store.id} className="border-b hover:bg-gray-50">
                   <td className="py-2 pr-4">
@@ -52,6 +57,9 @@ export default async function StoresListPage() {
                   <td className="py-2 pr-4 tabular-nums">{agg?._count ?? 0}</td>
                   <td className="py-2 pr-4 tabular-nums">
                     {formatCents(agg?._sum.calculatedAmountDueCents ?? 0)}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <MergeStoreButton storeId={store.id} otherStores={otherStores} />
                   </td>
                 </tr>
               );

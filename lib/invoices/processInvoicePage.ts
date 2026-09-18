@@ -1,10 +1,37 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Store } from "@prisma/client";
 import { ClaudeInvoiceExtractor } from "@/lib/extraction/providers/claude";
 import { validateInvoice, type InvoiceValidationResult } from "@/lib/validation/engine";
 import { toValidationInput } from "@/lib/validation/fromExtraction";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { uploadInvoiceFile } from "@/lib/storage/supabase";
+import type { ExtractedInvoice } from "@/lib/extraction/types";
+
+/**
+ * A store's identity is its address, not the printed store number — the
+ * number is unreliable (OCR misreads), and different real locations of the
+ * same chain can otherwise collide. Falls back to matching by number only
+ * when no address was extracted at all, so a page with no readable address
+ * doesn't spawn a duplicate store on every upload.
+ */
+async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
+  const address = extracted.storeAddress?.trim() || null;
+
+  const existing = address
+    ? await prisma.store.findUnique({ where: { address } })
+    : await prisma.store.findFirst({ where: { storeNumber: extracted.storeNumber } });
+
+  if (existing) {
+    return prisma.store.update({
+      where: { id: existing.id },
+      data: { name: extracted.storeName, address: address ?? existing.address, storeNumber: extracted.storeNumber },
+    });
+  }
+
+  return prisma.store.create({
+    data: { storeNumber: extracted.storeNumber, name: extracted.storeName, address },
+  });
+}
 
 export interface ProcessPageInput {
   buffer: Buffer;
@@ -74,15 +101,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     const validationInput = toValidationInput(extracted);
     const result = validateInvoice(validationInput);
 
-    const store = await prisma.store.upsert({
-      where: { storeNumber: extracted.storeNumber },
-      update: { name: extracted.storeName, address: extracted.storeAddress },
-      create: {
-        storeNumber: extracted.storeNumber,
-        name: extracted.storeName,
-        address: extracted.storeAddress,
-      },
-    });
+    const store = await resolveStore(extracted);
 
     const productIdByName = new Map(
       await Promise.all(

@@ -124,6 +124,20 @@ security patches. Notable side effects:
   and a Revenue by week table (Sunday-start weeks, computed in JS from
   `Invoice.invoiceDate` — no charting library yet, tiles and tables only,
   by design; a natural place to add a real chart later).
+- **A store's identity is its address, not its printed store number.**
+  `resolveStore()` in `lib/invoices/processInvoicePage.ts` matches an
+  incoming invoice to an existing `Store` by `address` first (falling back
+  to `storeNumber` only when no address was extracted at all). The printed
+  number is unreliable — it's just informational now, not the dedup key —
+  and different real locations of the same chain (e.g. 18 different Shell
+  stations across the invoices actually processed) would otherwise be
+  impossible to distinguish if grouped by name/number alone. `Store.address`
+  is `@unique`; `storeNumber` is not.
+- Same OCR-duplicate risk as products: `app/api/stores/merge/route.ts` +
+  `MergeStoreButton` on `/stores` let you manually merge two store rows
+  that turn out to be the same real location under slightly different
+  extracted address text — reassigns every `Invoice` and deletes the
+  duplicate `Store` row.
 - `app/stores` / `app/stores/[id]` — store list with invoice
   count/revenue, and a per-store invoice history linking into
   `/review/[id]`.
