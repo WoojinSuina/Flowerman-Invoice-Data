@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MonthSelect } from "@/components/dashboard/MonthSelect";
+import { StoreListModal } from "@/components/dashboard/StoreListModal";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -137,6 +138,14 @@ export default async function DashboardPage(props: {
     where: { id: { in: topStoresRaw.map((s) => s.storeId) } },
   });
   const storeById = new Map(stores.map((s) => [s.id, s]));
+  const allStoresEnriched = topStoresRaw.map((row) => ({
+    storeId: row.storeId,
+    storeName: storeById.get(row.storeId)?.name ?? row.storeId,
+    storeAddress: storeById.get(row.storeId)?.address ?? null,
+    qtySold: row.qtySold,
+    revenueCents: row.revenueCents,
+  }));
+  const topFiveStores = topStoresRaw.slice(0, 5);
 
   const topProductsRaw = await prisma.invoiceItem.groupBy({
     by: ["productId"],
@@ -199,8 +208,11 @@ export default async function DashboardPage(props: {
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
-          <h2 className="mb-2 font-medium">Stores (by qty sold)</h2>
-          {topStoresRaw.length === 0 ? (
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-medium">Top stores</h2>
+            {topStoresRaw.length > 0 && <StoreListModal stores={allStoresEnriched} />}
+          </div>
+          {topFiveStores.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
             <table className="w-full border-collapse text-sm">
@@ -212,7 +224,7 @@ export default async function DashboardPage(props: {
                 </tr>
               </thead>
               <tbody>
-                {topStoresRaw.map((row) => {
+                {topFiveStores.map((row) => {
                   const store = storeById.get(row.storeId);
                   return (
                     <tr key={row.storeId} className="border-b">
