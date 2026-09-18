@@ -10,7 +10,13 @@ interface StoreRow {
   storeAddress: string | null;
   qtySold: number;
   qtyDelivered: number;
+  qtyUnsold: number;
+  percentSold: number | null;
   revenueCents: number;
+}
+
+function formatPercent(percent: number | null): string {
+  return percent === null ? "—" : `${percent.toFixed(0)}%`;
 }
 
 export function StoreListModal({ stores }: { stores: StoreRow[] }) {
@@ -36,7 +42,7 @@ export function StoreListModal({ stores }: { stores: StoreRow[] }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b p-4">
-              <h3 className="font-medium">All stores (by qty sold)</h3>
+              <h3 className="font-medium">All stores (by % sold)</h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -50,7 +56,10 @@ export function StoreListModal({ stores }: { stores: StoreRow[] }) {
                 <thead>
                   <tr className="border-b text-left text-gray-500">
                     <th className="py-2 pr-4">Store</th>
-                    <th className="py-2 pr-4">Sold / delivered</th>
+                    <th className="py-2 pr-4">Delivered</th>
+                    <th className="py-2 pr-4">Sold</th>
+                    <th className="py-2 pr-4">Unsold</th>
+                    <th className="py-2 pr-4">% sold</th>
                     <th className="py-2 pr-4">Revenue</th>
                   </tr>
                 </thead>
@@ -65,9 +74,10 @@ export function StoreListModal({ stores }: { stores: StoreRow[] }) {
                           <div className="text-xs text-gray-500">{s.storeAddress}</div>
                         )}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">
-                        {s.qtySold} / {s.qtyDelivered}
-                      </td>
+                      <td className="py-2 pr-4 tabular-nums">{s.qtyDelivered}</td>
+                      <td className="py-2 pr-4 tabular-nums">{s.qtySold}</td>
+                      <td className="py-2 pr-4 tabular-nums">{s.qtyUnsold}</td>
+                      <td className="py-2 pr-4 tabular-nums">{formatPercent(s.percentSold)}</td>
                       <td className="py-2 pr-4 tabular-nums">{formatCents(s.revenueCents)}</td>
                     </tr>
                   ))}
