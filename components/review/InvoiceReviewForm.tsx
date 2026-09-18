@@ -48,6 +48,7 @@ function MoneyInput({
 export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
   const router = useRouter();
   const [baseline, setBaseline] = useState(invoice);
+  const [expanded, setExpanded] = useState(false);
 
   const [totals, setTotals] = useState({
     totalChargesCents: invoice.totalChargesCents,
@@ -157,14 +158,39 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto">
+    <div className={expanded ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 gap-6 lg:grid-cols-2"}>
+      <div
+        className={
+          expanded
+            ? "h-[calc(100vh-3rem)]"
+            : "lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto"
+        }
+      >
+        {invoice.sourceImageUrl && (
+          <div className="mb-2 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-sm text-blue-600 underline"
+            >
+              {expanded ? "Collapse" : "Expand"}
+            </button>
+            <a
+              href={invoice.sourceImageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 underline"
+            >
+              Open full size
+            </a>
+          </div>
+        )}
         {invoice.sourceImageUrl ? (
           invoice.sourceImageUrl.endsWith(".pdf") ? (
             <iframe
               src={invoice.sourceImageUrl}
               title={`Scanned invoice ${invoice.invoiceNumber}`}
-              className="h-[calc(100vh-3rem)] w-full rounded border"
+              className="h-[calc(100vh-6rem)] w-full rounded border"
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
@@ -181,7 +207,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         )}
       </div>
 
-      <div>
+      {!expanded && <div>
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold">
@@ -324,7 +350,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             {approving ? "Approving..." : "Approve"}
           </button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
