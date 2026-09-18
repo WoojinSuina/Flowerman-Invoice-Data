@@ -1,0 +1,186 @@
+// FLOWER MAN — Prisma schema
+// All money fields are stored as integer CENTS (never float) to avoid
+// rounding drift. Convert to display decimals only in the UI layer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ValidationStatus {
+  PROCESSING
+  PASS
+  REVIEW
+  APPROVED
+  FAILED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+model Store {
+  id          String   @id @default(uuid())
+  storeNumber String   @unique @map("store_number")
+  name        String
+  address     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  invoices Invoice[]
+
+  @@map("stores")
+}
+
+// Canonical product dictionary — products are NOT hardcoded into logic,
+// this table just dedupes names seen across invoices for analytics.
+model Product {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  invoiceItems InvoiceItem[]
+
+  @@map("products")
+}
+
+model Invoice {
+  id            String @id @default(uuid())
+  invoiceNumber String @map("invoice_number")
+  invoiceDate   DateTime @map("invoice_date")
+
+  storeId String @map("store_id")
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  // As printed/written on the invoice
+  totalChargesCents    Int @map("total_charges_cents")
+  totalCreditCents      Int @map("total_credit_cents")
+  totalAmountDueCents   Int @map("total_amount_due_cents")
+
+  // Independently computed by the validation engine
+  calculatedTotalChargesCents  Int @map("calculated_total_charges_cents")
+  calculatedTotalCreditCents   Int @map("calculated_total_credit_cents")
+  calculatedAmountDueCents     Int @map("calculated_amount_due_cents")
+
+  validationDifferenceCents Int              @map("validation_difference_cents")
+  validationStatus          ValidationStatus @default(PROCESSING) @map("validation_status")
+  validationSuggestions     Json?            @map("validation_suggestions") // array of suggestion strings
+
+  // Raw AI output, preserved forever, never overwritten
+  rawExtraction Json? @map("raw_extraction")
+
+  sourceFile     String  @map("source_file")
+  sourcePage     Int     @map("source_page")
+  sourceImageUrl String? @map("source_image_url")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  approvedAt DateTime? @map("approved_at")
+
+  items               InvoiceItem[]
+  manualCorrections   ManualCorrection[]
+  extractionAttempts  ExtractionAttempt[]
+
+  @@unique([invoiceNumber, storeId], name: "uniq_invoice_per_store")
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        String  @id @default(uuid())
+  invoiceId String  @map("invoice_id")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  productId   String? @map("product_id")
+  product     Product? @relation(fields: [productId], references: [id])
+  productName String  @map("product_name") // denormalized snapshot at time of invoice
+
+  lineNumber Int @default(0) @map("line_number") // stable position for ManualCorrection.fieldPath addressing
+
+  retailPriceCents Int @map("retail_price_cents")
+  unitCostCents    Int @map("unit_cost_cents")
+
+  deliveredQuantity Int @map("delivered_quantity")
+  returnedQuantity  Int @map("returned_quantity")
+  soldQuantity      Int @map("sold_quantity") // = delivered - returned, stored for query speed
+
+  deliveredAmountCents Int @map("delivered_amount_cents") // delivered * unitCost
+  returnCreditCents    Int @map("return_credit_cents")     // returned * unitCost
+  netSoldAmountCents   Int @map("net_sold_amount_cents")   // sold * unitCost
+
+  confidence Float? // 0-1, from AI extraction, especially for handwritten fields
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("invoice_items")
+}
+
+// One row per AI extraction call. Lets us audit how well the model performs
+// over time and re-run extraction without losing history.
+model ExtractionAttempt {
+  id        String  @id @default(uuid())
+  invoiceId String? @map("invoice_id")
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  provider     String // e.g. "claude-vision"
+  rawResponse  Json   @map("raw_response")
+  succeeded    Boolean
+  errorMessage String? @map("error_message")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("extraction_attempts")
+}
+
+// Every human edit to an extracted field, for audit trail (§8, §16)
+model ManualCorrection {
+  id        String  @id @default(uuid())
+  invoiceId String  @map("invoice_id")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  fieldPath     String @map("field_path") // e.g. "items[0].returnedQuantity"
+  originalValue String @map("original_value")
+  correctedValue String @map("corrected_value")
+  correctedBy   String? @map("corrected_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("manual_corrections")
+}
+
+model ProcessingJob {
+  id             String    @id @default(uuid())
+  filename       String
+  totalPages     Int       @map("total_pages")
+  processedPages Int       @default(0) @map("processed_pages")
+  passedPages    Int       @default(0) @map("passed_pages")
+  reviewPages    Int       @default(0) @map("review_pages")
+  failedPages    Int       @default(0) @map("failed_pages")
+  status         JobStatus @default(PENDING)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@map("processing_jobs")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type") // "invoice", "invoice_item", etc.
+  entityId   String   @map("entity_id")
+  action     String   // "created", "approved", "corrected", "status_changed"
+  detail     Json?
+  actor      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}

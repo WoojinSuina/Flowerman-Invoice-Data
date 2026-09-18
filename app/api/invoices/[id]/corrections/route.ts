@@ -1,0 +1,161 @@
+import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db/client";
+import { validateInvoice } from "@/lib/validation/engine";
+import { diffInvoiceTotals, diffLineItems, type FieldDiff } from "@/lib/validation/diffCorrections";
+
+export const runtime = "nodejs";
+
+const DEFAULT_ACTOR = "family";
+
+interface CorrectedItemInput {
+  id: string;
+  productName: string;
+  unitCostCents: number;
+  deliveredQuantity: number;
+  returnedQuantity: number;
+}
+
+interface CorrectionsRequestBody {
+  correctedBy?: string;
+  invoiceTotalChargesCents: number;
+  invoiceTotalCreditCents: number;
+  invoiceTotalAmountDueCents: number;
+  items: CorrectedItemInput[];
+}
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = (await req.json()) as CorrectionsRequestBody;
+
+  const existing = await prisma.invoice.findUnique({
+    where: { id: params.id },
+    include: { items: { orderBy: { lineNumber: "asc" } } },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const itemsById = new Map(existing.items.map((item) => [item.id, item]));
+  const correctedItemsByLine = body.items
+    .map((submitted) => {
+      const dbItem = itemsById.get(submitted.id);
+      if (!dbItem) return null;
+      return {
+        lineNumber: dbItem.lineNumber,
+        productName: submitted.productName,
+        unitCostCents: submitted.unitCostCents,
+        deliveredQuantity: submitted.deliveredQuantity,
+        returnedQuantity: submitted.returnedQuantity,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => a.lineNumber - b.lineNumber);
+
+  const originalItemShapes = existing.items.map((item) => ({
+    lineNumber: item.lineNumber,
+    productName: item.productName,
+    unitCostCents: item.unitCostCents,
+    deliveredQuantity: item.deliveredQuantity,
+    returnedQuantity: item.returnedQuantity,
+  }));
+  const originalTotals = {
+    invoiceTotalChargesCents: existing.totalChargesCents,
+    invoiceTotalCreditCents: existing.totalCreditCents,
+    invoiceTotalAmountDueCents: existing.totalAmountDueCents,
+  };
+  const correctedTotals = {
+    invoiceTotalChargesCents: body.invoiceTotalChargesCents,
+    invoiceTotalCreditCents: body.invoiceTotalCreditCents,
+    invoiceTotalAmountDueCents: body.invoiceTotalAmountDueCents,
+  };
+
+  const diffs: FieldDiff[] = [
+    ...diffInvoiceTotals(originalTotals, correctedTotals),
+    ...diffLineItems(originalItemShapes, correctedItemsByLine),
+  ];
+
+  const validation = validateInvoice({
+    ...correctedTotals,
+    items: correctedItemsByLine.map(({ productName, unitCostCents, deliveredQuantity, returnedQuantity }) => ({
+      productName,
+      unitCostCents,
+      deliveredQuantity,
+      returnedQuantity,
+    })),
+  });
+
+  if (diffs.length > 0) {
+    const actor = body.correctedBy?.trim() || DEFAULT_ACTOR;
+    const correctedByLine = new Map(correctedItemsByLine.map((item) => [item.lineNumber, item]));
+    const submittedById = new Map(body.items.map((item) => [item.id, item]));
+    // validation.items is index-aligned with correctedItemsByLine (both built
+    // by mapping over the same array in order) — match on that, not on
+    // productName, so duplicate product names can't cross-wire results.
+    const resultByLine = new Map(
+      correctedItemsByLine.map((item, index) => [item.lineNumber, validation.items[index]])
+    );
+
+    await prisma.$transaction([
+      prisma.invoice.update({
+        where: { id: existing.id },
+        data: {
+          totalChargesCents: correctedTotals.invoiceTotalChargesCents,
+          totalCreditCents: correctedTotals.invoiceTotalCreditCents,
+          totalAmountDueCents: correctedTotals.invoiceTotalAmountDueCents,
+          calculatedTotalChargesCents: validation.calculatedTotalChargesCents,
+          calculatedTotalCreditCents: validation.calculatedTotalCreditCents,
+          calculatedAmountDueCents: validation.calculatedAmountDueCents,
+          validationDifferenceCents: validation.differenceCents,
+          validationStatus: validation.status,
+          validationSuggestions: validation.suggestions as unknown as Prisma.InputJsonValue,
+        },
+      }),
+      ...existing.items.map((dbItem) => {
+        const corrected = correctedByLine.get(dbItem.lineNumber);
+        const submitted = corrected ? submittedById.get(dbItem.id) : undefined;
+        const result = resultByLine.get(dbItem.lineNumber);
+        if (!corrected || !submitted || !result) {
+          return prisma.invoiceItem.update({ where: { id: dbItem.id }, data: {} });
+        }
+        return prisma.invoiceItem.update({
+          where: { id: dbItem.id },
+          data: {
+            productName: corrected.productName,
+            unitCostCents: corrected.unitCostCents,
+            deliveredQuantity: corrected.deliveredQuantity,
+            returnedQuantity: corrected.returnedQuantity,
+            soldQuantity: result.soldQuantity,
+            deliveredAmountCents: result.deliveredAmountCents,
+            returnCreditCents: result.returnCreditCents,
+            netSoldAmountCents: result.netSoldAmountCents,
+          },
+        });
+      }),
+      prisma.manualCorrection.createMany({
+        data: diffs.map((diff) => ({
+          invoiceId: existing.id,
+          fieldPath: diff.fieldPath,
+          originalValue: diff.originalValue,
+          correctedValue: diff.correctedValue,
+          correctedBy: actor,
+        })),
+      }),
+      prisma.auditLog.create({
+        data: {
+          entityType: "invoice",
+          entityId: existing.id,
+          action: "corrected",
+          actor,
+          detail: { fieldsChanged: diffs.map((d) => d.fieldPath) },
+        },
+      }),
+    ]);
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: existing.id },
+    include: { store: true, items: { orderBy: { lineNumber: "asc" } } },
+  });
+
+  return NextResponse.json({ invoice, validation });
+}
