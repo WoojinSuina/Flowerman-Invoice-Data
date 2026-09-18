@@ -121,6 +121,12 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       )
     );
 
+    // A PASS with an exact $0.00 difference reconciled perfectly — there's
+    // no exception left for a human to resolve, so skip the manual Approve
+    // click and go straight to APPROVED (still logged in the audit trail,
+    // just with "system" as the actor instead of a person).
+    const autoApproved = result.status === "PASS" && result.differenceCents === 0;
+
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber: extracted.invoiceNumber,
@@ -133,7 +139,8 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         calculatedTotalCreditCents: result.calculatedTotalCreditCents,
         calculatedAmountDueCents: result.calculatedAmountDueCents,
         validationDifferenceCents: result.differenceCents,
-        validationStatus: result.status,
+        validationStatus: autoApproved ? "APPROVED" : result.status,
+        approvedAt: autoApproved ? new Date() : null,
         validationSuggestions: result.suggestions as unknown as Prisma.InputJsonValue,
         rawExtraction: extracted,
         sourceFile: sourceFileName,
@@ -172,6 +179,18 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       },
       include: { items: true },
     });
+
+    if (autoApproved) {
+      await prisma.auditLog.create({
+        data: {
+          entityType: "invoice",
+          entityId: invoice.id,
+          action: "auto-approved",
+          actor: "system",
+          detail: { reason: "exact reconciliation, $0.00 difference" },
+        },
+      });
+    }
 
     return { ok: true, invoice, validation: result };
   } catch (err) {

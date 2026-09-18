@@ -344,10 +344,10 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
           </button>
           <button
             onClick={handleApprove}
-            disabled={approving}
+            disabled={approving || status === "APPROVED"}
             className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-40"
           >
-            {approving ? "Approving..." : "Approve"}
+            {approving ? "Approving..." : status === "APPROVED" ? "Approved" : "Approve"}
           </button>
         </div>
       </div>}

@@ -39,6 +39,14 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   scanned image alongside editable fields, live PASS/REVIEW recalculation
   as you type (via `validateInvoice`, no server round-trip), Save and
   Approve actions.
+- **Auto-approval for exact reconciliations**: `processInvoicePage.ts`
+  marks an invoice `APPROVED` directly (skipping the manual Approve click)
+  when it's `PASS` *and* `validationDifferenceCents` is exactly 0 — a
+  PASS within the $0.01 tolerance still requires a human look, only a
+  perfect match doesn't. Still writes an `AuditLog` row (`actor: "system"`,
+  `action: "auto-approved"`) so the trail shows nothing was skipped
+  silently. 17 pre-existing PASS invoices with a $0.00 difference were
+  backfilled to `APPROVED` the same way, one time, by hand.
 
 ## What's built (Phase 3)
 
