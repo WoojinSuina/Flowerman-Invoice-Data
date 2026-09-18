@@ -173,8 +173,9 @@ npm run db:generate
 npm run dev
 ```
 
-Test the upload pipeline directly (accepts a single image, or a multi-page
-PDF which is split and processed one page per invoice):
+Open `/upload` in the browser to upload invoices through the UI (a single
+image, or a multi-page PDF — split and processed one page per invoice
+automatically). Or hit the endpoint directly:
 
 ```bash
 curl -X POST http://localhost:3000/api/invoices/upload \
