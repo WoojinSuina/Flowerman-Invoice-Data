@@ -225,6 +225,10 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         rawResponse: extracted as unknown as Prisma.InputJsonValue,
         succeeded: false,
         errorMessage: message,
+        // The file made it to storage before this failed (persisting the
+        // Invoice row is what threw), so it's still viewable even though no
+        // Invoice was ever created for it.
+        sourceImageUrl: uploadedFile.url,
       },
     });
     return { ok: false, sourcePage, error: message };

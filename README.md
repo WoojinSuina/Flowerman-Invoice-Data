@@ -63,6 +63,14 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   other invoice. There's no delete/merge action for confirmed duplicates
   yet — the human resolves it by editing one of the two, the same as any
   other REVIEW exception.
+- **Failed pages keep their scanned image.** `ExtractionAttempt.sourceImageUrl`
+  is set whenever a page's file made it to Supabase Storage before something
+  later failed (e.g. the duplicate-scan rejection above) — extraction/upload
+  failures never reach that point, so it stays null for those, which is
+  correct since there's no file to show. `/jobs/[id]`'s "Failed pages" table
+  renders it (via the same `PdfPageImage` component the review page uses)
+  so a failure can be visually confirmed against the actual scan instead of
+  just an error string.
 
 ## What's built (Phase 3)
 

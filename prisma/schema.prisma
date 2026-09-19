@@ -161,6 +161,10 @@ model ExtractionAttempt {
   rawResponse  Json   @map("raw_response")
   succeeded    Boolean
   errorMessage String? @map("error_message")
+  // Set only when the file was already uploaded to storage before the
+  // failure happened (e.g. a duplicate rejected at the DB write) so a failed
+  // page can still be viewed — never set when upload itself failed.
+  sourceImageUrl String? @map("source_image_url")
 
   createdAt DateTime @default(now()) @map("created_at")
 

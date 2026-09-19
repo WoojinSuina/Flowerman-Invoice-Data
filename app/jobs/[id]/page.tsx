@@ -3,6 +3,22 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
+import { PdfPageImage } from "@/components/review/PdfPageImage";
+
+function FailedPageImage({ url, page }: { url: string | null; page: number | null }) {
+  if (!url) {
+    return <span className="text-xs text-gray-400">No image available</span>;
+  }
+  const alt = `Scanned page ${page ?? "?"}`;
+  return url.endsWith(".pdf") ? (
+    <div className="w-48">
+      <PdfPageImage src={url} alt={alt} />
+    </div>
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt={alt} className="w-48 rounded border object-contain" />
+  );
+}
 
 export default async function JobDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -74,6 +90,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
             <thead>
               <tr className="border-b text-left text-gray-500">
                 <th className="py-2 pr-4">Page</th>
+                <th className="py-2 pr-4">Scanned image</th>
                 <th className="py-2 pr-4">Error</th>
               </tr>
             </thead>
@@ -81,6 +98,9 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
               {job.extractionAttempts.map((attempt) => (
                 <tr key={attempt.id} className="border-b">
                   <td className="py-2 pr-4">{attempt.sourcePage}</td>
+                  <td className="py-2 pr-4">
+                    <FailedPageImage url={attempt.sourceImageUrl} page={attempt.sourcePage} />
+                  </td>
                   <td className="py-2 pr-4 text-red-700">{attempt.errorMessage}</td>
                 </tr>
               ))}
