@@ -131,6 +131,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           validationDifferenceCents: validation.differenceCents,
           validationStatus: finalStatus,
           validationSuggestions: validation.suggestions as unknown as Prisma.InputJsonValue,
+          // A human just edited this invoice — clears any earlier
+          // bulk-tolerance auto-approval flag, since it's now had a real look.
+          autoApprovedReason: null,
         },
       }),
       ...existing.items.map((dbItem) => {

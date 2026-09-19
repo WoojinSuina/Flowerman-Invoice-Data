@@ -338,6 +338,32 @@ security patches. Notable side effects:
   (session-mode) is kept only for `prisma migrate`, which needs
   session-level features the transaction pooler doesn't support.
 
+- **Bulk-approve with a dollar tolerance, flagged for later recall.** The
+  existing "Approve all with $0.00 difference" bulk action on `/review`
+  (exact reconciliation — see Phase 2) is joined by a second one that
+  approves everything within a small dollar tolerance (currently $5,
+  `BULK_TOLERANCE_DOLLARS` in `app/review/page.tsx`) — built to clear a
+  large REVIEW backlog (hundreds of invoices) too big to check by hand,
+  without silently trusting numbers nobody actually looked at.
+  - Unlike the exact-$0.00 case, this is a judgment call, not a
+    mathematical certainty, so every invoice it touches gets
+    `Invoice.autoApprovedReason` set (nullable, otherwise unused) recording
+    why. `lib/reviewFilters.ts`'s `buildReviewWhere` treats
+    `status=AUTO_APPROVED` as a pseudo-filter (`validationStatus: APPROVED
+    AND autoApprovedReason IS NOT NULL`) — a permanent "come back and spot
+    check these" queue, separate from both REVIEW and true APPROVED.
+  - The review list shows a small "(auto)" marker next to the status badge
+    for these, and opening one directly (`/review/[id]`) shows a banner
+    explaining it was never individually reviewed.
+  - The flag clears itself the moment a human actually acts on the
+    invoice — via the manual Approve button (`[id]/approve/route.ts`) or by
+    saving a correction (`[id]/corrections/route.ts`) — since at that point
+    it genuinely has been looked at.
+  - Same safety net as the $0.00 case: excludes invoices already flagged as
+    a possible duplicate, and excludes any invoice with a physically
+    impossible line item (`returned > delivered`) even if the top-line
+    total happens to land within tolerance by coincidence.
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Adding/removing line items during review (corrections only edit existing

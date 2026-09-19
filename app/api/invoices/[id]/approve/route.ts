@@ -20,7 +20,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const invoice = await prisma.invoice.update({
     where: { id: params.id },
-    data: { validationStatus: "APPROVED", approvedAt: new Date() },
+    // A human just opened this invoice and clicked Approve — clears any
+    // earlier bulk-tolerance auto-approval flag, since it's now had a real
+    // look regardless of how it got to APPROVED before.
+    data: { validationStatus: "APPROVED", approvedAt: new Date(), autoApprovedReason: null },
   });
 
   await prisma.auditLog.create({

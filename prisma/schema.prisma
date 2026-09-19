@@ -117,6 +117,13 @@ model Invoice {
   updatedAt  DateTime  @updatedAt @map("updated_at")
   approvedAt DateTime? @map("approved_at")
 
+  // Set only when APPROVED came from a bulk tolerance action (e.g. "approve
+  // everything under $5 difference") rather than a human actually opening
+  // this invoice and clicking Approve. Null means either not approved, or
+  // approved after a real look — lets a later audit pull up exactly the
+  // ones nobody's eyes have actually been on. See lib/reviewFilters.ts.
+  autoApprovedReason String? @map("auto_approved_reason")
+
   items               InvoiceItem[]
   manualCorrections   ManualCorrection[]
   extractionAttempts  ExtractionAttempt[]

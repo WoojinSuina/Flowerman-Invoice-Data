@@ -30,6 +30,7 @@ interface ReviewInvoice {
   totalAmountDueCents: number;
   items: ReviewItem[];
   duplicateOf?: { id: string; invoiceNumber: string; sourceImageUrl: string | null } | null;
+  autoApprovedReason?: string | null;
 }
 
 function ScannedImage({ url, alt }: { url: string; alt: string }) {
@@ -310,6 +311,13 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             at this store has the same date and matches on total amount due or
             line items — check whether this is a separate delivery or an
             accidental re-scan before approving.
+          </div>
+        )}
+
+        {invoice.autoApprovedReason && (
+          <div className="mb-4 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+            This invoice was auto-approved by a bulk action, not individually
+            reviewed: {invoice.autoApprovedReason}
           </div>
         )}
 

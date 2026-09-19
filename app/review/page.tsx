@@ -6,11 +6,24 @@ import { NavBar } from "@/components/NavBar";
 import { ReviewFilters } from "@/components/review/ReviewFilters";
 import { BulkApproveButton } from "@/components/review/BulkApproveButton";
 import { parseMonthParam, formatMonthLabel, getWeekStart, weekParam, formatWeekLabel } from "@/lib/dates";
-import { buildReviewWhere, findZeroDiffApprovableInvoiceIds } from "@/lib/reviewFilters";
+import {
+  buildReviewWhere,
+  findToleranceApprovableInvoiceIds,
+  findZeroDiffApprovableInvoiceIds,
+} from "@/lib/reviewFilters";
 import type { ValidationStatus } from "@prisma/client";
 
-const FILTERS: (ValidationStatus | "ALL")[] = ["REVIEW", "PASS", "APPROVED", "FAILED", "ALL"];
+const FILTERS: (ValidationStatus | "ALL" | "AUTO_APPROVED")[] = [
+  "REVIEW",
+  "PASS",
+  "APPROVED",
+  "AUTO_APPROVED",
+  "FAILED",
+  "ALL",
+];
+const FILTER_LABELS: Record<string, string> = { AUTO_APPROVED: "AUTO-APPROVED" };
 const PAGE_SIZE = 25;
+const BULK_TOLERANCE_DOLLARS = 5;
 
 export default async function ReviewListPage(props: {
   searchParams: Promise<{
@@ -40,8 +53,15 @@ export default async function ReviewListPage(props: {
   const filterParams = { status, store: storeFilter, month: monthFilter, week: weekFilter };
   const where = buildReviewWhere(filterParams);
 
-  const [invoices, totalCount, zeroDiffApprovableIds, stores, monthRows, invoiceDatesForWeeks] =
-    await Promise.all([
+  const [
+    invoices,
+    totalCount,
+    zeroDiffApprovableIds,
+    toleranceApprovableIds,
+    stores,
+    monthRows,
+    invoiceDatesForWeeks,
+  ] = await Promise.all([
       prisma.invoice.findMany({
         where,
         include: { store: true },
@@ -51,6 +71,7 @@ export default async function ReviewListPage(props: {
       }),
       prisma.invoice.count({ where }),
       findZeroDiffApprovableInvoiceIds(filterParams),
+      findToleranceApprovableInvoiceIds(filterParams, BULK_TOLERANCE_DOLLARS * 100),
       prisma.store.findMany({ orderBy: { name: "asc" } }),
       prisma.$queryRaw<{ month: string }[]>`
       SELECT DISTINCT to_char(invoice_date, 'YYYY-MM') AS month
@@ -92,14 +113,22 @@ export default async function ReviewListPage(props: {
               status === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            {f}
+            {FILTER_LABELS[f] ?? f}
           </Link>
         ))}
       </nav>
 
       <ReviewFilters stores={storeOptions} months={monthOptions} weeks={weekOptions} />
 
-      <BulkApproveButton eligibleCount={zeroDiffApprovableIds.length} />
+      <BulkApproveButton
+        eligibleCount={zeroDiffApprovableIds.length}
+        label={`Approve all ${zeroDiffApprovableIds.length} with $0.00 difference`}
+      />
+      <BulkApproveButton
+        eligibleCount={toleranceApprovableIds.length}
+        maxDifferenceDollars={BULK_TOLERANCE_DOLLARS}
+        label={`Approve all ${toleranceApprovableIds.length} with under $${BULK_TOLERANCE_DOLLARS} difference (flagged for later review)`}
+      />
 
       {invoices.length === 0 ? (
         <p className="text-gray-500">No invoices match these filters.</p>
@@ -133,6 +162,14 @@ export default async function ReviewListPage(props: {
                 </td>
                 <td className="py-2 pr-4">
                   <StatusBadge status={invoice.validationStatus} />
+                  {invoice.autoApprovedReason && (
+                    <span
+                      className="ml-1 text-xs text-gray-400"
+                      title={invoice.autoApprovedReason}
+                    >
+                      (auto)
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 pr-4">{formatCents(invoice.validationDifferenceCents)}</td>
               </tr>
