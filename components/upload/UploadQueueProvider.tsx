@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 interface UploadResultItem {
   sourcePage: number;
@@ -46,6 +46,24 @@ let nextId = 0;
 export function UploadQueueProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [processing, setProcessing] = useState(false);
+
+  // A File object can't be serialized to sessionStorage/localStorage or
+  // survive any full page reload (refresh, tab discard, closing the tab) —
+  // there is no browser API for that. The only real defense against losing
+  // queued/in-flight uploads is stopping the reload from happening by
+  // accident in the first place.
+  useEffect(() => {
+    const hasUnfinishedWork = processing || queue.some((item) => item.status === "queued");
+    if (!hasUnfinishedWork) return;
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [processing, queue]);
 
   function addFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;

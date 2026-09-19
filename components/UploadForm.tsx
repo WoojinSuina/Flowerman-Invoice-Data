@@ -39,8 +39,9 @@ export function UploadForm() {
         <p className="mb-4 text-sm text-gray-500">
           {doneCount} of {queue.length} done
           {errorCount > 0 ? `, ${errorCount} failed` : ""} — files process one at a
-          time (multi-page PDFs also extract one page at a time). Processing
-          continues even if you switch to another page.
+          time (multi-page PDFs also extract one page at a time). Switching to
+          another page in this app is fine, processing keeps going — but
+          refreshing or closing this tab will lose anything not yet uploaded.
         </p>
       )}
 
