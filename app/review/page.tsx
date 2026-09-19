@@ -3,23 +3,64 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
-import type { ValidationStatus } from "@prisma/client";
+import { ReviewFilters } from "@/components/review/ReviewFilters";
+import {
+  parseMonthParam,
+  formatMonthLabel,
+  getWeekStart,
+  weekParam,
+  parseWeekParam,
+  formatWeekLabel,
+} from "@/lib/dates";
+import type { ValidationStatus, Prisma } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL")[] = ["REVIEW", "PASS", "APPROVED", "FAILED", "ALL"];
 const PAGE_SIZE = 25;
 
-export default async function ReviewListPage(
-  props: {
-    searchParams: Promise<{ status?: string; page?: string }>;
-  }
-) {
+export default async function ReviewListPage(props: {
+  searchParams: Promise<{
+    status?: string;
+    page?: string;
+    store?: string;
+    month?: string;
+    week?: string;
+  }>;
+}) {
   const searchParams = await props.searchParams;
   const status = searchParams.status ?? "REVIEW";
   const page = Math.max(1, Number(searchParams.page) || 1);
+  const storeFilter = searchParams.store ?? "";
+  const monthFilter = searchParams.month ?? "";
+  const weekFilter = searchParams.week ?? "";
 
-  const where = status === "ALL" ? undefined : { validationStatus: status as ValidationStatus };
+  function buildQuery(overrides: Record<string, string | undefined>) {
+    const params = new URLSearchParams();
+    const merged = { status, page: String(page), store: storeFilter, month: monthFilter, week: weekFilter, ...overrides };
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) params.set(key, value);
+    }
+    return `/review?${params.toString()}`;
+  }
 
-  const [invoices, totalCount] = await Promise.all([
+  const where: Prisma.InvoiceWhereInput = {};
+  if (status !== "ALL") where.validationStatus = status as ValidationStatus;
+  if (storeFilter) where.storeId = storeFilter;
+  if (weekFilter) {
+    const weekStart = parseWeekParam(weekFilter);
+    if (weekStart) {
+      const weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+      where.invoiceDate = { gte: weekStart, lt: weekEnd };
+    }
+  } else if (monthFilter) {
+    const monthStart = parseMonthParam(monthFilter);
+    const nextMonthStart = new Date(
+      Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1)
+    );
+    where.invoiceDate = { gte: monthStart, lt: nextMonthStart };
+  }
+
+  const [invoices, totalCount, stores, monthRows, invoiceDatesForWeeks] = await Promise.all([
     prisma.invoice.findMany({
       where,
       include: { store: true },
@@ -28,19 +69,43 @@ export default async function ReviewListPage(
       take: PAGE_SIZE,
     }),
     prisma.invoice.count({ where }),
+    prisma.store.findMany({ orderBy: { name: "asc" } }),
+    prisma.$queryRaw<{ month: string }[]>`
+      SELECT DISTINCT to_char(invoice_date, 'YYYY-MM') AS month
+      FROM invoices
+      ORDER BY month DESC
+    `,
+    prisma.invoice.findMany({ select: { invoiceDate: true }, distinct: ["invoiceDate"] }),
   ]);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const storeOptions = stores.map((s) => ({
+    value: s.id,
+    label: s.address ? `${s.name} — ${s.address}` : s.name,
+  }));
+  const monthOptions = monthRows.map((r) => ({
+    value: r.month,
+    label: formatMonthLabel(parseMonthParam(r.month)),
+  }));
+  const weekStartsSeen = new Map<string, Date>();
+  for (const inv of invoiceDatesForWeeks) {
+    const weekStart = getWeekStart(inv.invoiceDate);
+    weekStartsSeen.set(weekParam(weekStart), weekStart);
+  }
+  const weekOptions = [...weekStartsSeen.entries()]
+    .sort((a, b) => b[1].getTime() - a[1].getTime())
+    .map(([value, weekStart]) => ({ value, label: formatWeekLabel(weekStart) }));
 
   return (
     <main className="mx-auto max-w-5xl p-6">
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Invoice Review</h1>
 
-      <nav className="mb-6 flex gap-2">
+      <nav className="mb-4 flex gap-2">
         {FILTERS.map((f) => (
           <Link
             key={f}
-            href={`/review?status=${f}`}
+            href={buildQuery({ status: f, page: undefined })}
             className={`rounded px-3 py-1 text-sm ${
               status === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
@@ -50,8 +115,10 @@ export default async function ReviewListPage(
         ))}
       </nav>
 
+      <ReviewFilters stores={storeOptions} months={monthOptions} weeks={weekOptions} />
+
       {invoices.length === 0 ? (
-        <p className="text-gray-500">No invoices with status {status}.</p>
+        <p className="text-gray-500">No invoices match these filters.</p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -97,7 +164,7 @@ export default async function ReviewListPage(
           </span>
           <div className="flex gap-2">
             <Link
-              href={`/review?status=${status}&page=${page - 1}`}
+              href={buildQuery({ page: String(page - 1) })}
               aria-disabled={page <= 1}
               className={`rounded px-3 py-1 ${
                 page <= 1
@@ -108,7 +175,7 @@ export default async function ReviewListPage(
               Previous
             </Link>
             <Link
-              href={`/review?status=${status}&page=${page + 1}`}
+              href={buildQuery({ page: String(page + 1) })}
               aria-disabled={page >= totalPages}
               className={`rounded px-3 py-1 ${
                 page >= totalPages

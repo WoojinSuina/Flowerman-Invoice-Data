@@ -4,43 +4,17 @@ import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MonthSelect } from "@/components/dashboard/MonthSelect";
 import { StoreListModal } from "@/components/dashboard/StoreListModal";
+import {
+  parseMonthParam,
+  monthParam,
+  formatMonthLabel,
+  getWeekStart,
+  formatWeekLabel,
+} from "@/lib/dates";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
 export const dynamic = "force-dynamic";
-
-function parseMonthParam(month: string | undefined): Date {
-  if (month) {
-    const match = month.match(/^(\d{4})-(\d{2})$/);
-    if (match) {
-      const year = Number(match[1]);
-      const monthIndex = Number(match[2]) - 1;
-      if (monthIndex >= 0 && monthIndex <= 11) {
-        return new Date(Date.UTC(year, monthIndex, 1));
-      }
-    }
-  }
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-}
-
-function monthParam(date: Date): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function getWeekStart(date: Date): Date {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  d.setUTCDate(d.getUTCDate() - d.getUTCDay()); // back up to Sunday
-  return d;
-}
-
-function formatWeekLabel(weekStart: Date): string {
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
-  const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-  return `${fmt(weekStart)} – ${fmt(weekEnd)}`;
-}
 
 function percentSold(sold: number, delivered: number): number | null {
   return delivered > 0 ? (sold / delivered) * 100 : null;
@@ -80,11 +54,7 @@ export default async function DashboardPage(props: {
   const searchParams = await props.searchParams;
   const monthStart = parseMonthParam(searchParams.month);
   const nextMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
-  const monthLabel = monthStart.toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  const monthLabel = formatMonthLabel(monthStart);
   const thisMonth = { invoiceDate: { gte: monthStart, lt: nextMonthStart } };
 
   const monthRows = await prisma.$queryRaw<{ month: string }[]>`
@@ -98,11 +68,7 @@ export default async function DashboardPage(props: {
     .sort((a, b) => (a < b ? 1 : -1))
     .map((value) => ({
       value,
-      label: parseMonthParam(value).toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-        timeZone: "UTC",
-      }),
+      label: formatMonthLabel(parseMonthParam(value)),
     }));
 
   const [totalInvoices, revenue, potentialRevenue, reviewCount] = await Promise.all([
