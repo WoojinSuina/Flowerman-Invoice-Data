@@ -1,17 +1,7 @@
-import { NavBar } from "@/components/NavBar";
-import { UploadForm } from "@/components/UploadForm";
+import { redirect } from "next/navigation";
 
+// Upload now lives on the Jobs page — kept as a redirect instead of a 404
+// in case anything still links to /upload.
 export default function UploadPage() {
-  return (
-    <main className="mx-auto max-w-3xl p-6">
-      <NavBar />
-      <h1 className="mb-4 text-2xl font-semibold">Upload Invoices</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Select one or more invoice images or multi-page PDFs (one invoice per page)
-        — each is split and processed automatically. Files upload one at a time;
-        add as many as you like and they&apos;ll queue up.
-      </p>
-      <UploadForm />
-    </main>
-  );
+  redirect("/jobs");
 }

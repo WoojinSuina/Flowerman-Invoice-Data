@@ -76,6 +76,15 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   both render the current scan next to the existing one (via the same
   `PdfPageImage` component) so a duplicate can be visually confirmed against
   the actual scans instead of just an error string or invoice number.
+- **Upload merged into Jobs.** `/upload` was a separate page whose only
+  purpose was feeding the same `ProcessingJob` list shown on `/jobs` — now
+  `UploadForm` renders at the top of `/jobs` itself, so upload progress and
+  batch history are on one page. `/upload` still resolves (redirects to
+  `/jobs`) rather than 404ing in case anything linked to it, and the
+  `NavBar` Upload entry is gone. `UploadQueueProvider` also calls
+  `router.refresh()` after each file in the queue finishes, so a new job
+  appears in the table live if you're sitting on this page while a batch
+  runs, instead of only after a manual reload.
 
 ## What's built (Phase 3)
 

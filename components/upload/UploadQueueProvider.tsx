@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 interface UploadResultItem {
   sourcePage: number;
@@ -44,6 +45,7 @@ let nextId = 0;
  * what made the queue appear to "disappear" when switching to another tab.
  */
 export function UploadQueueProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [processing, setProcessing] = useState(false);
 
@@ -102,6 +104,9 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
           )
         );
       }
+      // Picks up the new/updated ProcessingJob row if the Jobs page happens
+      // to be the active route — a no-op refresh of whatever else is open.
+      router.refresh();
     }
     setProcessing(false);
   }

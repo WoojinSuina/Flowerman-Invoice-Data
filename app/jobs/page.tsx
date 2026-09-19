@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
+import { UploadForm } from "@/components/UploadForm";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -16,7 +17,16 @@ export default async function JobsListPage() {
   return (
     <main className="mx-auto max-w-5xl p-6">
       <NavBar />
-      <h1 className="mb-4 text-2xl font-semibold">Batch Jobs</h1>
+      <h1 className="mb-4 text-2xl font-semibold">Upload &amp; Jobs</h1>
+      <p className="mb-6 text-sm text-gray-500">
+        Select one or more invoice images or multi-page PDFs (one invoice per page)
+        — each is split and processed automatically. Files upload one at a time;
+        add as many as you like and they&apos;ll queue up.
+      </p>
+
+      <UploadForm />
+
+      <h2 className="mb-4 mt-8 text-lg font-medium">Batch jobs</h2>
 
       {jobs.length === 0 ? (
         <p className="text-gray-500">No uploads yet.</p>
