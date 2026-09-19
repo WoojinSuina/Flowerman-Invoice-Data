@@ -364,6 +364,27 @@ security patches. Notable side effects:
     impossible line item (`returned > delivered`) even if the top-line
     total happens to land within tolerance by coincidence.
 
+- **`/reconciliation`** — quantifies what it costs (or saves) to approve an
+  invoice on its written total when the line items add up to something
+  else, since that's the actual practice for small discrepancies (see the
+  bulk-tolerance approve above). `lib/reconciliation.ts`'s
+  `getMismatchedInvoices()` pulls every invoice where
+  `validationDifferenceCents` is outside the $0.01 rounding tolerance, and
+  splits the net dollar impact (`calculated - written`) into what's
+  already been approved (money treated as settled) vs. what's still sitting
+  in REVIEW (not yet decided).
+  - Each mismatch is also classified `plausible` vs `likely_misread`
+    (`LIKELY_MISREAD_THRESHOLD_CENTS`, currently $50): a gap that size is
+    almost certainly a transcription/OCR digit error, not an employee's
+    arithmetic slip, and shouldn't be counted as "error cost" without a
+    human re-checking the scan first. The threshold came directly from the
+    data — two ~$970 outliers turned out to be exactly this.
+  - Surfaced as a Dashboard tile (all-time net for approved mismatches)
+    and its own page with status/classification filters, a per-invoice
+    breakdown sorted by impact size, and a worst-stores-by-net-loss table
+    (useful for spotting one location's employee making the same mistake
+    repeatedly).
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Adding/removing line items during review (corrections only edit existing

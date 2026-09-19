@@ -4,6 +4,7 @@ import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MonthSelect } from "@/components/dashboard/MonthSelect";
 import { StoreListModal } from "@/components/dashboard/StoreListModal";
+import { getMismatchedInvoices, summarizeMismatches } from "@/lib/reconciliation";
 import {
   parseMonthParam,
   monthParam,
@@ -29,15 +30,18 @@ function StatTile({
   label,
   value,
   href,
+  sub,
 }: {
   label: string;
   value: string;
   href?: string;
+  sub?: string;
 }) {
   const content = (
     <div className="rounded border p-4">
       <p className="text-sm text-gray-500">{label}</p>
       <p className="text-3xl font-semibold">{value}</p>
+      {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
     </div>
   );
   return href ? (
@@ -72,12 +76,14 @@ export default async function DashboardPage(props: {
       label: formatMonthLabel(parseMonthParam(value)),
     }));
 
-  const [totalInvoices, revenue, potentialRevenue, reviewCount] = await Promise.all([
+  const [totalInvoices, revenue, potentialRevenue, reviewCount, mismatches] = await Promise.all([
     prisma.invoice.count({ where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
     prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
     prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
+    getMismatchedInvoices(),
   ]);
+  const reconciliationSummary = summarizeMismatches(mismatches);
 
   const monthInvoicesForStores = await prisma.invoice.findMany({
     where: thisMonth,
@@ -181,7 +187,7 @@ export default async function DashboardPage(props: {
         <MonthSelect value={monthParam(monthStart)} options={monthOptions} />
       </div>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
         <StatTile
           label="Potential revenue (no returns)"
@@ -195,6 +201,12 @@ export default async function DashboardPage(props: {
           label="Needs review"
           value={reviewCount.toLocaleString()}
           href="/review?status=REVIEW"
+        />
+        <StatTile
+          label="Write-in error impact"
+          value={formatCents(reconciliationSummary.approvedNetCents)}
+          sub="approved invoices, all-time"
+          href="/reconciliation"
         />
       </div>
 
