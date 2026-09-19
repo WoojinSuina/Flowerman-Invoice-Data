@@ -41,6 +41,13 @@ function ScannedImage({ url, alt }: { url: string; alt: string }) {
   );
 }
 
+// Both inputs below use local text state instead of formatting `value`
+// straight from the numeric prop on every keystroke. Reformatting mid-edit
+// (e.g. forcing "5" -> "5.00" via toFixed, or "" -> "0" via `Number(x) || 0`)
+// is what made typing feel "funky" — the display would fight the user
+// before they finished a decimal point or cleared a field to retype it.
+// The raw text is freely editable; it only gets normalized on blur.
+
 function MoneyInput({
   cents,
   onChange,
@@ -48,13 +55,52 @@ function MoneyInput({
   cents: number;
   onChange: (cents: number) => void;
 }) {
+  const [text, setText] = useState(() => centsToDollars(cents).toFixed(2));
+
   return (
     <input
-      type="number"
-      step="0.01"
+      type="text"
+      inputMode="decimal"
       className="w-24 rounded border px-2 py-1 text-right"
-      value={centsToDollars(cents).toFixed(2)}
-      onChange={(e) => onChange(dollarsToCents(Number(e.target.value) || 0))}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw);
+        const parsed = Number(raw);
+        if (raw.trim() !== "" && !Number.isNaN(parsed)) {
+          onChange(dollarsToCents(parsed));
+        }
+      }}
+      onBlur={() => setText(centsToDollars(cents).toFixed(2))}
+    />
+  );
+}
+
+function QuantityInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const [text, setText] = useState(() => String(value));
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      className="w-16 rounded border px-2 py-1 text-right"
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw);
+        if (raw.trim() === "" || raw === "-") return;
+        const parsed = Number(raw);
+        if (!Number.isNaN(parsed) && Number.isInteger(parsed)) {
+          onChange(parsed);
+        }
+      }}
+      onBlur={() => setText(String(value))}
     />
   );
 }
@@ -348,23 +394,15 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <input
-                      type="number"
-                      className="w-16 rounded border px-2 py-1 text-right"
+                    <QuantityInput
                       value={item.deliveredQuantity}
-                      onChange={(e) =>
-                        updateItem(item.id, { deliveredQuantity: Number(e.target.value) || 0 })
-                      }
+                      onChange={(v) => updateItem(item.id, { deliveredQuantity: v })}
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <input
-                      type="number"
-                      className="w-16 rounded border px-2 py-1 text-right"
+                    <QuantityInput
                       value={item.returnedQuantity}
-                      onChange={(e) =>
-                        updateItem(item.id, { returnedQuantity: Number(e.target.value) || 0 })
-                      }
+                      onChange={(v) => updateItem(item.id, { returnedQuantity: v })}
                     />
                   </td>
                   <td className="py-1 pr-2">{result?.soldQuantity}</td>
