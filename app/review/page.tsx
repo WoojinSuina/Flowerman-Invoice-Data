@@ -4,15 +4,10 @@ import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
 import { ReviewFilters } from "@/components/review/ReviewFilters";
-import {
-  parseMonthParam,
-  formatMonthLabel,
-  getWeekStart,
-  weekParam,
-  parseWeekParam,
-  formatWeekLabel,
-} from "@/lib/dates";
-import type { ValidationStatus, Prisma } from "@prisma/client";
+import { BulkApproveButton } from "@/components/review/BulkApproveButton";
+import { parseMonthParam, formatMonthLabel, getWeekStart, weekParam, formatWeekLabel } from "@/lib/dates";
+import { buildReviewWhere, findZeroDiffApprovableInvoiceIds } from "@/lib/reviewFilters";
+import type { ValidationStatus } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL")[] = ["REVIEW", "PASS", "APPROVED", "FAILED", "ALL"];
 const PAGE_SIZE = 25;
@@ -42,41 +37,28 @@ export default async function ReviewListPage(props: {
     return `/review?${params.toString()}`;
   }
 
-  const where: Prisma.InvoiceWhereInput = {};
-  if (status !== "ALL") where.validationStatus = status as ValidationStatus;
-  if (storeFilter) where.storeId = storeFilter;
-  if (weekFilter) {
-    const weekStart = parseWeekParam(weekFilter);
-    if (weekStart) {
-      const weekEnd = new Date(weekStart);
-      weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
-      where.invoiceDate = { gte: weekStart, lt: weekEnd };
-    }
-  } else if (monthFilter) {
-    const monthStart = parseMonthParam(monthFilter);
-    const nextMonthStart = new Date(
-      Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1)
-    );
-    where.invoiceDate = { gte: monthStart, lt: nextMonthStart };
-  }
+  const filterParams = { status, store: storeFilter, month: monthFilter, week: weekFilter };
+  const where = buildReviewWhere(filterParams);
 
-  const [invoices, totalCount, stores, monthRows, invoiceDatesForWeeks] = await Promise.all([
-    prisma.invoice.findMany({
-      where,
-      include: { store: true },
-      orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-    prisma.invoice.count({ where }),
-    prisma.store.findMany({ orderBy: { name: "asc" } }),
-    prisma.$queryRaw<{ month: string }[]>`
+  const [invoices, totalCount, zeroDiffApprovableIds, stores, monthRows, invoiceDatesForWeeks] =
+    await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        include: { store: true },
+        orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }],
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+      prisma.invoice.count({ where }),
+      findZeroDiffApprovableInvoiceIds(filterParams),
+      prisma.store.findMany({ orderBy: { name: "asc" } }),
+      prisma.$queryRaw<{ month: string }[]>`
       SELECT DISTINCT to_char(invoice_date, 'YYYY-MM') AS month
       FROM invoices
       ORDER BY month DESC
     `,
-    prisma.invoice.findMany({ select: { invoiceDate: true }, distinct: ["invoiceDate"] }),
-  ]);
+      prisma.invoice.findMany({ select: { invoiceDate: true }, distinct: ["invoiceDate"] }),
+    ]);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const storeOptions = stores.map((s) => ({
@@ -116,6 +98,8 @@ export default async function ReviewListPage(props: {
       </nav>
 
       <ReviewFilters stores={storeOptions} months={monthOptions} weeks={weekOptions} />
+
+      <BulkApproveButton eligibleCount={zeroDiffApprovableIds.length} />
 
       {invoices.length === 0 ? (
         <p className="text-gray-500">No invoices match these filters.</p>

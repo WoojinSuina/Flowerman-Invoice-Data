@@ -271,7 +271,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
               <th className="py-1 pr-2">Delivered</th>
               <th className="py-1 pr-2">Returned</th>
               <th className="py-1 pr-2">Sold</th>
-              <th className="py-1 pr-2">Net amount</th>
+              <th className="py-1 pr-2">Total credit</th>
             </tr>
           </thead>
           <tbody>
@@ -316,7 +316,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
                     />
                   </td>
                   <td className="py-1 pr-2">{result?.soldQuantity}</td>
-                  <td className="py-1 pr-2">{formatCents(result?.netSoldAmountCents ?? 0)}</td>
+                  <td className="py-1 pr-2">{formatCents(result?.returnCreditCents ?? 0)}</td>
                 </tr>
               );
             })}
