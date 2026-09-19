@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
+import { formatInvoiceDate } from "@/lib/dates";
 
 export default async function StoreDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -46,7 +47,7 @@ export default async function StoreDetailPage(props: { params: Promise<{ id: str
                     {invoice.invoiceNumber}
                   </Link>
                 </td>
-                <td className="py-2 pr-4">{new Date(invoice.invoiceDate).toLocaleDateString()}</td>
+                <td className="py-2 pr-4">{formatInvoiceDate(invoice.invoiceDate)}</td>
                 <td className="py-2 pr-4">
                   <StatusBadge status={invoice.validationStatus} />
                 </td>

@@ -22,6 +22,15 @@ export function monthParam(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// For a plain calendar date (no time-of-day component, stored as UTC
+// midnight) — never call toLocaleDateString on it directly, since a
+// server running behind UTC (e.g. America/Chicago) renders UTC midnight as
+// the previous local day. Use this everywhere an Invoice.invoiceDate (or
+// similar) is shown to a person.
+export function formatInvoiceDate(date: Date): string {
+  return date.toLocaleDateString(undefined, { timeZone: "UTC" });
+}
+
 export function formatMonthLabel(date: Date): string {
   return date.toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
 }

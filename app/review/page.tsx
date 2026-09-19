@@ -5,7 +5,14 @@ import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
 import { ReviewFilters } from "@/components/review/ReviewFilters";
 import { BulkApproveButton } from "@/components/review/BulkApproveButton";
-import { parseMonthParam, formatMonthLabel, getWeekStart, weekParam, formatWeekLabel } from "@/lib/dates";
+import {
+  parseMonthParam,
+  formatMonthLabel,
+  getWeekStart,
+  weekParam,
+  formatWeekLabel,
+  formatInvoiceDate,
+} from "@/lib/dates";
 import {
   buildReviewWhere,
   findToleranceApprovableInvoiceIds,
@@ -158,7 +165,7 @@ export default async function ReviewListPage(props: {
                   )}
                 </td>
                 <td className="py-2 pr-4">
-                  {new Date(invoice.invoiceDate).toLocaleDateString()}
+                  {formatInvoiceDate(invoice.invoiceDate)}
                 </td>
                 <td className="py-2 pr-4">
                   <StatusBadge status={invoice.validationStatus} />
