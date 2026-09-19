@@ -31,6 +31,7 @@ export default async function ReviewDetailPage(props: { params: Promise<{ id: st
           invoiceNumber: invoice.invoiceNumber,
           storeName: invoice.store.name,
           sourceImageUrl: invoice.sourceImageUrl,
+          invoiceDate: invoice.invoiceDate.toISOString().slice(0, 10),
           validationStatus: invoice.validationStatus,
           duplicateOf,
           totalChargesCents: invoice.totalChargesCents,

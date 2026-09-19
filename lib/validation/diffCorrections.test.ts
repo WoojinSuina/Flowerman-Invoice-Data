@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { diffInvoiceTotals, diffLineItems } from "./diffCorrections.ts";
+import { diffInvoiceTotals, diffInvoiceDate, diffLineItems } from "./diffCorrections.ts";
 
 test("diffInvoiceTotals: no changes -> empty diff", () => {
   const totals = {
@@ -59,4 +59,16 @@ test("diffLineItems: unmatched lineNumber in corrected set is ignored", () => {
     },
   ];
   assert.deepEqual(diffLineItems(original, []), []);
+});
+
+test("diffInvoiceDate: no change -> null", () => {
+  assert.equal(diffInvoiceDate("2026-08-11", "2026-08-11"), null);
+});
+
+test("diffInvoiceDate: a corrected date is reported", () => {
+  assert.deepEqual(diffInvoiceDate("2026-12-08", "2026-09-08"), {
+    fieldPath: "invoiceDate",
+    originalValue: "2026-12-08",
+    correctedValue: "2026-09-08",
+  });
 });

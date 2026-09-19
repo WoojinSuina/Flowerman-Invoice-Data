@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { validateInvoice, type LineItemInput } from "@/lib/validation/engine";
 import { centsToDollars, dollarsToCents, formatCents } from "@/lib/money";
+import { isFutureDate } from "@/lib/dates";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
 
@@ -22,6 +23,7 @@ interface ReviewInvoice {
   invoiceNumber: string;
   storeName: string;
   sourceImageUrl: string | null;
+  invoiceDate: string;
   validationStatus: string;
   totalChargesCents: number;
   totalCreditCents: number;
@@ -67,6 +69,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
     totalCreditCents: invoice.totalCreditCents,
     totalAmountDueCents: invoice.totalAmountDueCents,
   });
+  const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate);
   const [items, setItems] = useState<ReviewItem[]>(invoice.items);
   const [status, setStatus] = useState(invoice.validationStatus);
   const [saving, setSaving] = useState(false);
@@ -90,6 +93,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
 
   const changedFields = useMemo(() => {
     const changes: string[] = [];
+    if (invoiceDate !== baseline.invoiceDate) changes.push("Invoice date");
     if (totals.totalChargesCents !== baseline.totalChargesCents) changes.push("Total charges");
     if (totals.totalCreditCents !== baseline.totalCreditCents) changes.push("Total credit");
     if (totals.totalAmountDueCents !== baseline.totalAmountDueCents)
@@ -106,7 +110,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         changes.push(`${original.productName}: returned qty`);
     }
     return changes;
-  }, [totals, items, baseline]);
+  }, [invoiceDate, totals, items, baseline]);
 
   function updateItem(id: string, patch: Partial<ReviewItem>) {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -120,6 +124,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          invoiceDate,
           invoiceTotalChargesCents: totals.totalChargesCents,
           invoiceTotalCreditCents: totals.totalCreditCents,
           invoiceTotalAmountDueCents: totals.totalAmountDueCents,
@@ -140,6 +145,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
       setStatus(data.invoice.validationStatus);
       setBaseline({
         ...invoice,
+        invoiceDate,
         totalChargesCents: totals.totalChargesCents,
         totalCreditCents: totals.totalCreditCents,
         totalAmountDueCents: totals.totalAmountDueCents,
@@ -261,13 +267,31 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
           </div>
         )}
 
+        {isFutureDate(new Date(invoiceDate)) && (
+          <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            This invoice is dated {invoiceDate}, which is after today — a
+            delivery can&apos;t happen in the future. Usually a month/day swap
+            on a hard-to-read scan; check the image and correct the date
+            below before approving.
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
             {error}
           </div>
         )}
 
-        <div className="mb-4 grid grid-cols-3 gap-4 rounded border p-3 text-sm">
+        <div className="mb-4 grid grid-cols-4 gap-4 rounded border p-3 text-sm">
+          <label className="flex flex-col gap-1">
+            Invoice date
+            <input
+              type="date"
+              className="rounded border px-2 py-1"
+              value={invoiceDate}
+              onChange={(e) => setInvoiceDate(e.target.value)}
+            />
+          </label>
           <label className="flex flex-col gap-1">
             Total charges
             <MoneyInput

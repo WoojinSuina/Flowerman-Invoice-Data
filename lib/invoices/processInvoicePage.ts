@@ -5,6 +5,7 @@ import { toValidationInput } from "@/lib/validation/fromExtraction";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { uploadInvoiceFile } from "@/lib/storage/supabase";
+import { isFutureDate } from "@/lib/dates";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
 
 /**
@@ -185,15 +186,26 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       )
     );
 
+    // A delivery invoice can never be dated after today — this is a hard
+    // fact, not a heuristic. Almost always a month/day swap on a scan where
+    // one digit is faded/illegible (confirmed on a real case: "0?/12/26"
+    // read as December instead of month 0?, day 12). Forces REVIEW even if
+    // the math otherwise reconciled, same as a possible duplicate.
+    const invoiceDateIsFuture = isFutureDate(new Date(extracted.invoiceDate));
+
     // A PASS with an exact $0.00 difference reconciled perfectly — there's
     // no exception left for a human to resolve, so skip the manual Approve
     // click and go straight to APPROVED (still logged in the audit trail,
     // just with "system" as the actor instead of a person). A possible
-    // duplicate always forces REVIEW regardless, since it's exactly the
-    // kind of exception a human needs to resolve.
+    // duplicate or an impossible (future) date always forces REVIEW
+    // regardless, since both are exactly the kind of exception a human
+    // needs to resolve.
     const autoApproved =
-      !possibleDuplicate && result.status === "PASS" && result.differenceCents === 0;
-    const finalStatus = possibleDuplicate ? "REVIEW" : result.status;
+      !possibleDuplicate &&
+      !invoiceDateIsFuture &&
+      result.status === "PASS" &&
+      result.differenceCents === 0;
+    const finalStatus = possibleDuplicate || invoiceDateIsFuture ? "REVIEW" : result.status;
 
     const invoice = await prisma.invoice.create({
       data: {

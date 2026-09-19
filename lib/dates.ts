@@ -50,3 +50,13 @@ export function formatWeekLabel(weekStart: Date): string {
     d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
   return `${fmt(weekStart)} – ${fmt(weekEnd)}`;
 }
+
+// A delivery invoice can never be dated after today — this is a hard
+// business-logic fact, not a heuristic. Used to force REVIEW on an
+// impossible date (usually a month/day swap on a hard-to-read scan) instead
+// of trusting whatever the model output even if the math otherwise reconciled.
+export function isFutureDate(date: Date): boolean {
+  const now = new Date();
+  const todayUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return date.getTime() > todayUtcMidnight;
+}

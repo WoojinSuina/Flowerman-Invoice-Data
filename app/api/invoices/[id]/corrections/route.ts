@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
 import { validateInvoice } from "@/lib/validation/engine";
-import { diffInvoiceTotals, diffLineItems, type FieldDiff } from "@/lib/validation/diffCorrections";
+import {
+  diffInvoiceTotals,
+  diffInvoiceDate,
+  diffLineItems,
+  type FieldDiff,
+} from "@/lib/validation/diffCorrections";
+import { isFutureDate } from "@/lib/dates";
 
 export const runtime = "nodejs";
 
@@ -18,6 +24,7 @@ interface CorrectedItemInput {
 
 interface CorrectionsRequestBody {
   correctedBy?: string;
+  invoiceDate: string; // "YYYY-MM-DD"
   invoiceTotalChargesCents: number;
   invoiceTotalCreditCents: number;
   invoiceTotalAmountDueCents: number;
@@ -69,10 +76,15 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     invoiceTotalCreditCents: body.invoiceTotalCreditCents,
     invoiceTotalAmountDueCents: body.invoiceTotalAmountDueCents,
   };
+  const originalInvoiceDateStr = existing.invoiceDate.toISOString().slice(0, 10);
+  const correctedInvoiceDate = new Date(body.invoiceDate);
 
   const diffs: FieldDiff[] = [
     ...diffInvoiceTotals(originalTotals, correctedTotals),
     ...diffLineItems(originalItemShapes, correctedItemsByLine),
+    ...(diffInvoiceDate(originalInvoiceDateStr, body.invoiceDate)
+      ? [diffInvoiceDate(originalInvoiceDateStr, body.invoiceDate) as FieldDiff]
+      : []),
   ];
 
   const validation = validateInvoice({
@@ -84,6 +96,15 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       returnedQuantity,
     })),
   });
+
+  // A possible-duplicate flag or an impossible (future) date both force
+  // REVIEW regardless of what the recalculated math says — same rule as at
+  // ingestion time, and neither is something a total/line-item correction
+  // alone can resolve.
+  const finalStatus =
+    existing.possibleDuplicateOfId || isFutureDate(correctedInvoiceDate)
+      ? "REVIEW"
+      : validation.status;
 
   if (diffs.length > 0) {
     const actor = body.correctedBy?.trim() || DEFAULT_ACTOR;
@@ -100,6 +121,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       prisma.invoice.update({
         where: { id: existing.id },
         data: {
+          invoiceDate: correctedInvoiceDate,
           totalChargesCents: correctedTotals.invoiceTotalChargesCents,
           totalCreditCents: correctedTotals.invoiceTotalCreditCents,
           totalAmountDueCents: correctedTotals.invoiceTotalAmountDueCents,
@@ -107,7 +129,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           calculatedTotalCreditCents: validation.calculatedTotalCreditCents,
           calculatedAmountDueCents: validation.calculatedAmountDueCents,
           validationDifferenceCents: validation.differenceCents,
-          validationStatus: validation.status,
+          validationStatus: finalStatus,
           validationSuggestions: validation.suggestions as unknown as Prisma.InputJsonValue,
         },
       }),

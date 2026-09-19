@@ -85,6 +85,21 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   `router.refresh()` after each file in the queue finishes, so a new job
   appears in the table live if you're sitting on this page while a batch
   runs, instead of only after a manual reload.
+- **Impossible (future) invoice dates force REVIEW.** A delivery can't be
+  dated after today — that's a hard fact, not a heuristic — but a
+  hard-to-read scan can still get its month/day swapped by the model
+  (confirmed on a real case: `0?/12/26` printed, with the month digit
+  faded/illegible, extracted as December instead of month `0?`, day 12).
+  `lib/dates.ts` exports `isFutureDate()`; `processInvoicePage.ts` forces
+  `REVIEW` (and blocks auto-approval) whenever the extracted date is after
+  today, the same way a possible duplicate does. `invoiceDate` is now an
+  editable field in `InvoiceReviewForm` (previously the only editable
+  fields were totals and line items) with a banner explaining the problem,
+  so once flagged, a human can actually fix it — the corrections endpoint
+  re-checks `isFutureDate()` on save and re-applies `REVIEW` if the
+  corrected date is still in the future. No migration needed since
+  `invoiceDate` already existed; this only changes when/how it can be
+  edited and what forces review.
 
 ## What's built (Phase 3)
 

@@ -54,6 +54,11 @@ export function diffInvoiceTotals(
   return diffs.filter((d): d is FieldDiff => d !== null);
 }
 
+export function diffInvoiceDate(original: string, corrected: string): FieldDiff | null {
+  if (original === corrected) return null;
+  return { fieldPath: "invoiceDate", originalValue: original, correctedValue: corrected };
+}
+
 export function diffLineItems(original: LineItemShape[], corrected: LineItemShape[]): FieldDiff[] {
   const correctedByLine = new Map(corrected.map((item) => [item.lineNumber, item]));
   const diffs: FieldDiff[] = [];
