@@ -68,7 +68,7 @@ export function StoreListModal({ stores, month }: { stores: StoreRow[]; month: s
                     <tr key={s.storeId} className="border-b">
                       <td className="py-2 pr-4">
                         <Link
-                          href={`/review?store=${s.storeId}&month=${month}`}
+                          href={`/review?status=ALL&store=${s.storeId}&month=${month}`}
                           className="text-blue-600 underline"
                         >
                           {s.storeName}

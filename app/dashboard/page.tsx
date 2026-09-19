@@ -227,7 +227,7 @@ export default async function DashboardPage(props: {
                     <tr key={row.storeId} className="border-b">
                       <td className="py-2 pr-4">
                         <Link
-                          href={`/review?store=${row.storeId}&month=${monthParam(monthStart)}`}
+                          href={`/review?status=ALL&store=${row.storeId}&month=${monthParam(monthStart)}`}
                           className="text-blue-600 underline"
                         >
                           {store?.name ?? row.storeId}
@@ -306,7 +306,7 @@ export default async function DashboardPage(props: {
                   <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
                   <td className="py-2 pr-4 tabular-nums">
                     <Link
-                      href={`/review?week=${weekParam(week.weekStart)}`}
+                      href={`/review?status=ALL&week=${weekParam(week.weekStart)}`}
                       className="text-blue-600 underline"
                     >
                       {week.count}
