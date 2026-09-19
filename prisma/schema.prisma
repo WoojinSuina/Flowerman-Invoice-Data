@@ -216,8 +216,37 @@ model ProcessingJob {
 
   invoices           Invoice[]
   extractionAttempts ExtractionAttempt[]
+  pendingPages       PendingPage[]
 
   @@map("processing_jobs")
+}
+
+// A page that has been uploaded to Storage but not yet run through Claude
+// extraction. Upload is split into two steps specifically so the upload
+// request itself stays fast (just splitting a PDF and storing bytes, no
+// Vision API calls) — Vercel's serverless functions have a timeout that a
+// single request extracting every page of a large PDF would blow through,
+// and a slow request is also what made refreshing/closing the tab mid-batch
+// lose work. Extraction happens later, one row at a time, via a
+// self-chaining background process (see app/api/jobs/process-next).
+model PendingPage {
+  id              String        @id @default(uuid())
+  processingJobId String        @map("processing_job_id")
+  processingJob   ProcessingJob @relation(fields: [processingJobId], references: [id], onDelete: Cascade)
+
+  sourcePage     Int    @map("source_page") // 1-based, matches Invoice.sourcePage
+  sourceFileName String @map("source_file_name")
+  storageUrl     String @map("storage_url")
+  mimeType       String @map("mime_type")
+
+  // Set when a chain link claims this row, cleared never — a row is deleted
+  // once actually processed. A claimedAt older than a few minutes is treated
+  // as abandoned (e.g. the function crashed mid-Claude-call) and reclaimed,
+  // so one bad page can't stall the whole queue forever.
+  claimedAt DateTime? @map("claimed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("pending_pages")
 }
 
 model AuditLog {

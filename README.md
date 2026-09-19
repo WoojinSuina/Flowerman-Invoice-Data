@@ -288,12 +288,65 @@ security patches. Notable side effects:
   store with only REVIEW invoices shows that badge plus an explanation
   instead of an empty table.
 
+## What's built (Phase 6)
+
+- **Upload and extraction are now two separate steps.** `POST
+  /api/invoices/upload` only splits a PDF (if needed) and uploads each page
+  to Supabase Storage — no Claude calls — then returns as soon as every
+  page is queued, typically a couple seconds regardless of page count. The
+  actual per-page extraction happens afterward, in the background.
+- **Why**: the old synchronous batch processing (Phase 3) ran every page's
+  Claude extraction inside the same request the browser was waiting on. A
+  large PDF could take 10+ minutes, which meant (a) refreshing or closing
+  the tab mid-batch lost all progress — a `File` object can't survive a
+  real page reload, there's no client-side fix for that — and (b) it would
+  likely blow through Vercel's serverless function duration limit on
+  deployment. Decoupling upload from extraction fixes both: the request
+  the browser waits on is fast, and the background work happens in short,
+  independent steps.
+- `prisma/schema.prisma` — new `PendingPage` model: one row per page that's
+  been uploaded to Storage but not yet extracted. `ProcessingJob` gained a
+  `pendingPages` relation.
+- `lib/invoices/pageQueue.ts` — the queue mechanics:
+  - `claimNextPendingPage()` atomically claims the oldest unclaimed page
+    via `UPDATE ... FOR UPDATE SKIP LOCKED`, so concurrent callers can
+    never grab the same row. A claim older than 5 minutes is treated as
+    abandoned (e.g. the function crashed mid-extraction) and reclaimed —
+    self-healing, no separate cron needed for the common case.
+  - `triggerPageProcessing()` fires `POST /api/jobs/process-next` via
+    Next.js's `after()` API (not a bare un-awaited `fetch`, which can be
+    silently dropped on Vercel once the response is sent).
+- `app/api/jobs/process-next/route.ts` — a **self-chaining worker**: each
+  call claims exactly one page, extracts and persists it (reusing
+  `processInvoicePage`), then triggers itself again before returning. This
+  keeps every individual invocation short (safe under a serverless
+  timeout) no matter how large the original batch was. When the queue is
+  empty, the chain simply stops.
+- **Internal-auth header for server-to-server calls**: `proxy.ts` normally
+  gates every route behind the `fm_auth` session cookie, but the
+  self-trigger above is server-to-server and carries no cookie. It
+  authenticates instead with an `x-internal-secret` header checked against
+  `AUTH_SECRET`, scoped to only the `/api/jobs/process-next` path — the
+  cookie gate for everything else is unchanged.
+- `app/api/invoices/upload/route.ts` response shape changed accordingly —
+  see "Local development" below.
+- **Connection pooling**: this phase is also why `DATABASE_URL` now points
+  at Supabase's transaction-mode pooler (port 6543) instead of
+  session-mode (port 5432) — session mode caps the whole project at 15
+  connections project-wide, which a background worker chaining through
+  many pages back-to-back could exhaust. A separate `DIRECT_URL`
+  (session-mode) is kept only for `prisma migrate`, which needs
+  session-level features the transaction pooler doesn't support.
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Adding/removing line items during review (corrections only edit existing
   items by id)
-- Async/polled batch processing — uploads are currently synchronous (see
-  "Architectural notes" below for why, and when to revisit)
+- A Vercel Cron sweep hitting `/api/jobs/process-next` as a defense-in-depth
+  safety net — the stale-claim reclamation in `pageQueue.ts` already
+  self-heals whenever any new trigger fires, so this isn't required for
+  correctness, just extra insurance against a chain going silent after
+  deployment
 - Charts on the Dashboard — currently KPI tiles + tables only
 
 ## Setup
@@ -327,7 +380,7 @@ npm run dev
 ```
 
 Open `/upload` in the browser to upload invoices through the UI (a single
-image, or a multi-page PDF — split and processed one page per invoice
+image, or a multi-page PDF — split and queued one page per invoice
 automatically). Or hit the endpoint directly:
 
 ```bash
@@ -335,10 +388,11 @@ curl -X POST http://localhost:3000/api/invoices/upload \
   -F "file=@/path/to/invoices.pdf"
 ```
 
-Response is `{ job, results[] }` — `job` is the `ProcessingJob` row
-(progress/pass/review/failed counts), `results[]` has one entry per page:
-either `{ sourcePage, invoice, validation }` on success or `{ sourcePage,
-error }` on failure. A single-image upload is just a batch of one.
+Response is `{ job }` — the `ProcessingJob` row, returned as soon as every
+page is uploaded and queued (see "What's built (Phase 6)" above).
+Extraction hasn't happened yet at this point, so there are no per-page
+results in the response; track progress on `/jobs/[id]`, which updates as
+the background worker processes each page.
 
 ## Testing
 
@@ -365,6 +419,8 @@ against production `DATABASE_URL` as part of your deploy step.
    review queue screen.
 4. **Phase 4** — Dashboard, Stores, Products analytics.
 5. **Phase 5** — Delivery recommendations (transparent stats, not ML).
+6. **Phase 6** — Async upload/extraction: fast upload + queue, self-chaining
+   background worker, safe for serverless deployment.
 
 ## Architectural notes
 
@@ -393,16 +449,10 @@ against production `DATABASE_URL` as part of your deploy step.
   table preserve what the AI originally said, forever. `manual_corrections`
   records every human edit with original/corrected/timestamp. Nothing is
   overwritten.
-- **Batch processing is synchronous (Phase 3)**: a PDF upload splits and
-  processes every page sequentially within the same HTTP request, only
-  returning once the whole batch is done. This is deliberately simple and
-  fine for local/self-hosted use at the MVP's expected volume (~100
-  pages/week). **Revisit before deploying to Vercel** — a large batch (many
-  pages, each a multi-second Claude call) can exceed serverless function
-  duration limits. The fix, when needed, is exactly what was originally
-  anticipated here: move the loop off the request thread and have the
-  client poll the `ProcessingJob` row for progress — no Redis/BullMQ
-  required at this volume, just moving where the loop runs.
+- **Batch processing is async (Phase 6)**: see "What's built (Phase 6)"
+  above. Upload only splits/stores; a self-chaining `/api/jobs/process-next`
+  worker does one page's extraction per invocation and re-triggers itself,
+  so no single request runs long regardless of batch size.
 - **`document`-block type gap**: `lib/extraction/providers/claude.ts` casts
   around a TypeScript type gap in the pinned `@anthropic-ai/sdk@^0.32.0`
   (it predates the SDK's `document` content-block type; the API itself

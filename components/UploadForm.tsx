@@ -37,10 +37,10 @@ export function UploadForm() {
 
       {queue.length > 0 && (
         <p className="mb-4 text-sm text-gray-500">
-          {doneCount} of {queue.length} done
-          {errorCount > 0 ? `, ${errorCount} failed` : ""} — files process one at a
-          time (multi-page PDFs also extract one page at a time). Switching to
-          another page in this app is fine, processing keeps going — but
+          {doneCount} of {queue.length} uploaded
+          {errorCount > 0 ? `, ${errorCount} failed` : ""} — uploading is quick
+          (extraction happens afterward in the background, tracked on the Jobs
+          list below). Switching to another page in this app is fine, but
           refreshing or closing this tab will lose anything not yet uploaded.
         </p>
       )}
@@ -55,54 +55,41 @@ export function UploadForm() {
             </tr>
           </thead>
           <tbody>
-            {queue.map((item) => {
-              const pageErrors = item.response?.results.filter((r) => r.error).length ?? 0;
-              return (
-                <tr key={item.id} className="border-b align-top">
-                  <td className="py-2 pr-4">{item.file.name}</td>
-                  <td className="py-2 pr-4">
-                    {item.status === "queued" && (
-                      <>
-                        <span className="text-gray-500">Queued</span>
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="ml-2 text-xs text-gray-400 underline"
-                        >
-                          remove
-                        </button>
-                      </>
-                    )}
-                    {item.status === "uploading" && (
-                      <span className="text-blue-600">Processing…</span>
-                    )}
-                    {item.status === "done" && <StatusBadge status={item.response!.job.status} />}
-                    {item.status === "error" && <span className="text-red-700">Failed</span>}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {item.status === "done" && item.response && (
-                      <div>
-                        <Link
-                          href={`/jobs/${item.response.job.id}`}
-                          className="text-blue-600 underline"
-                        >
-                          {item.response.results.length} page
-                          {item.response.results.length === 1 ? "" : "s"}
-                        </Link>
-                        {pageErrors > 0 && (
-                          <span className="ml-2 text-red-700">
-                            ({pageErrors} page error{pageErrors === 1 ? "" : "s"})
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {item.status === "error" && (
-                      <span className="text-red-700">{item.error}</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {queue.map((item) => (
+              <tr key={item.id} className="border-b align-top">
+                <td className="py-2 pr-4">{item.file.name}</td>
+                <td className="py-2 pr-4">
+                  {item.status === "queued" && (
+                    <>
+                      <span className="text-gray-500">Queued</span>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="ml-2 text-xs text-gray-400 underline"
+                      >
+                        remove
+                      </button>
+                    </>
+                  )}
+                  {item.status === "uploading" && (
+                    <span className="text-blue-600">Uploading…</span>
+                  )}
+                  {item.status === "done" && <StatusBadge status={item.response!.job.status} />}
+                  {item.status === "error" && <span className="text-red-700">Failed</span>}
+                </td>
+                <td className="py-2 pr-4">
+                  {item.status === "done" && item.response && (
+                    <Link href={`/jobs/${item.response.job.id}`} className="text-blue-600 underline">
+                      {item.response.job.totalPages} page
+                      {item.response.job.totalPages === 1 ? "" : "s"} — view progress
+                    </Link>
+                  )}
+                  {item.status === "error" && (
+                    <span className="text-red-700">{item.error}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}

@@ -3,15 +3,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-interface UploadResultItem {
-  sourcePage: number;
-  invoice?: { id: string; invoiceNumber: string; validationStatus: string };
-  error?: string;
-}
-
 export interface UploadResponse {
+  // Extraction hasn't happened yet at this point — upload only splits and
+  // stores the file, then queues it for background processing (see
+  // PendingPage in schema.prisma) — so there are no per-page results here,
+  // just the job to track progress on via /jobs.
   job: { id: string; filename: string; totalPages: number; status: string };
-  results: UploadResultItem[];
   error?: string;
   detail?: string;
 }

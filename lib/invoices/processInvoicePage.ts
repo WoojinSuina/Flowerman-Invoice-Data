@@ -4,7 +4,6 @@ import { validateInvoice, type InvoiceValidationResult } from "@/lib/validation/
 import { toValidationInput } from "@/lib/validation/fromExtraction";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
-import { uploadInvoiceFile } from "@/lib/storage/supabase";
 import { isFutureDate } from "@/lib/dates";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
 
@@ -76,6 +75,11 @@ export interface ProcessPageInput {
   sourceFileName: string;
   sourcePage: number; // 1-based
   processingJobId: string;
+  // Already uploaded to Storage by the caller (the fast upload/queueing
+  // step) — this function only extracts and persists, it doesn't touch
+  // Storage itself. See PendingPage in schema.prisma for why upload and
+  // extraction are two separate steps.
+  sourceImageUrl: string;
 }
 
 type InvoiceWithItems = Prisma.InvoiceGetPayload<{ include: { items: true } }>;
@@ -87,13 +91,15 @@ export type ProcessPageResult =
 /**
  * Turns one page's bytes (an image, or a single-page PDF from
  * lib/pdf/splitPages.ts) into a persisted Invoice: extract, validate,
- * store the file, upsert the Store, create Invoice+Items+ExtractionAttempt.
+ * upsert the Store, create Invoice+Items+ExtractionAttempt. The file itself
+ * is already in Storage by the time this runs (see sourceImageUrl on
+ * ProcessPageInput) — this function only extracts and persists.
  * Every failure mode is caught and returned as { ok: false } with an audit
  * trail row — this must never throw, so one bad page in a batch doesn't
  * abort the pages after it.
  */
 export async function processInvoicePage(input: ProcessPageInput): Promise<ProcessPageResult> {
-  const { buffer, mimeType, sourceFileName, sourcePage, processingJobId } = input;
+  const { buffer, mimeType, sourceFileName, sourcePage, processingJobId, sourceImageUrl } = input;
   const extractor = new ClaudeInvoiceExtractor();
 
   let extracted;
@@ -115,25 +121,6 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
   }
 
   let store: Store | undefined;
-  let uploadedFile;
-  try {
-    uploadedFile = await uploadInvoiceFile(buffer, mimeType);
-  } catch (err) {
-    const message = (err as Error).message;
-    // Extraction succeeded but storage didn't — still record that the
-    // extraction worked (for audit/debugging), just with no Invoice to
-    // attach it to.
-    await prisma.extractionAttempt.create({
-      data: {
-        provider: extractor.providerName,
-        processingJobId,
-        sourcePage,
-        rawResponse: extracted as unknown as Prisma.InputJsonValue,
-        succeeded: true,
-      },
-    });
-    return { ok: false, sourcePage, error: `Storage upload failed: ${message}` };
-  }
 
   try {
     const validationInput = toValidationInput(extracted);
@@ -226,7 +213,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         rawExtraction: extracted,
         sourceFile: sourceFileName,
         sourcePage,
-        sourceImageUrl: uploadedFile.url,
+        sourceImageUrl,
         processingJobId,
         items: {
           create: result.items.map((item, index) => ({
@@ -297,10 +284,10 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         rawResponse: extracted as unknown as Prisma.InputJsonValue,
         succeeded: false,
         errorMessage: message,
-        // The file made it to storage before this failed (persisting the
-        // Invoice row is what threw), so it's still viewable even though no
+        // Always uploaded already at this point (the caller uploads before
+        // calling this function), so it's still viewable even though no
         // Invoice was ever created for it.
-        sourceImageUrl: uploadedFile.url,
+        sourceImageUrl,
         duplicateOfInvoiceId: collidingInvoice?.id ?? null,
       },
     });

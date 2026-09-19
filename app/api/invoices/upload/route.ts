@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { splitPdfIntoPages } from "@/lib/pdf/splitPages";
-import { processInvoicePage, type ProcessPageResult } from "@/lib/invoices/processInvoicePage";
+import { uploadInvoiceFile } from "@/lib/storage/supabase";
+import { triggerPageProcessing } from "@/lib/invoices/pageQueue";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB — keep below next.config.ts's proxyClientMaxBodySize
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
 
-interface PageToProcess {
+interface PageToUpload {
   buffer: Buffer;
   mimeType: string;
   sourcePage: number;
 }
 
+/**
+ * Deliberately fast: split the PDF and upload every page's bytes to
+ * Storage, then hand off to the background queue (see PendingPage in
+ * schema.prisma) — no Claude Vision calls happen in this request. A large
+ * multi-page PDF extracting every page synchronously here would risk
+ * blowing through Vercel's serverless function timeout once deployed, and
+ * ties up the browser tab for as long as extraction takes either way.
+ */
 export async function POST(req: NextRequest) {
   let formData: FormData;
   try {
@@ -30,18 +39,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
   if (!ALLOWED_TYPES.has(file.type)) {
-    return NextResponse.json(
-      { error: `Unsupported file type: ${file.type}` },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: `Unsupported file type: ${file.type}` }, { status: 400 });
   }
   if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json({ error: "File too large (max 15MB)" }, { status: 400 });
+    return NextResponse.json({ error: "File too large (max 20MB)" }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  let pages: PageToProcess[];
+  let pages: PageToUpload[];
   if (file.type === "application/pdf") {
     try {
       const splitPages = await splitPdfIntoPages(buffer);
@@ -61,55 +67,43 @@ export async function POST(req: NextRequest) {
   }
 
   const job = await prisma.processingJob.create({
-    data: { filename: file.name, totalPages: pages.length, status: "PROCESSING" },
+    data: { filename: file.name, totalPages: pages.length, status: "PENDING" },
   });
 
-  const results: ProcessPageResult[] = [];
-  for (const page of pages) {
-    const result = await processInvoicePage({
-      buffer: page.buffer,
-      mimeType: page.mimeType,
-      sourceFileName: file.name,
-      sourcePage: page.sourcePage,
-      processingJobId: job.id,
-    });
-    results.push(result);
-
-    // "APPROVED" here always means an exact-$0.00-difference invoice that
-    // processInvoicePage auto-approved at creation (a PASS, just skipped
-    // the manual click) — count it as passed, not as an unaccounted-for
-    // fourth bucket, so passed+review+failed always sums to processed.
-    const isPassed =
-      result.ok &&
-      (result.invoice.validationStatus === "PASS" ||
-        result.invoice.validationStatus === "APPROVED");
+  try {
+    // Concurrent — these are Storage API calls, not database connections,
+    // so they aren't subject to the Postgres connection-pool limit that
+    // per-invoice DB writes are.
+    const uploadedPages = await Promise.all(
+      pages.map(async (page) => {
+        const uploaded = await uploadInvoiceFile(page.buffer, page.mimeType);
+        return {
+          processingJobId: job.id,
+          sourcePage: page.sourcePage,
+          sourceFileName: file.name,
+          storageUrl: uploaded.url,
+          mimeType: page.mimeType,
+        };
+      })
+    );
+    await prisma.pendingPage.createMany({ data: uploadedPages });
+  } catch (err) {
     await prisma.processingJob.update({
       where: { id: job.id },
-      data: {
-        processedPages: { increment: 1 },
-        passedPages: { increment: isPassed ? 1 : 0 },
-        reviewPages: {
-          increment: result.ok && result.invoice.validationStatus === "REVIEW" ? 1 : 0,
-        },
-        failedPages: { increment: result.ok ? 0 : 1 },
-      },
+      data: { status: "FAILED", completedAt: new Date() },
     });
+    return NextResponse.json(
+      { error: "Could not upload one or more pages", detail: (err as Error).message },
+      { status: 500 }
+    );
   }
 
-  const anyFailed = results.some((r) => !r.ok);
-  const completedJob = await prisma.processingJob.update({
+  const processingJob = await prisma.processingJob.update({
     where: { id: job.id },
-    data: {
-      status: anyFailed ? "COMPLETED_WITH_ERRORS" : "COMPLETED",
-      completedAt: new Date(),
-    },
+    data: { status: "PROCESSING" },
   });
 
-  const responseResults = results.map((r) =>
-    r.ok === true
-      ? { sourcePage: r.invoice.sourcePage, invoice: r.invoice, validation: r.validation }
-      : { sourcePage: r.sourcePage, error: r.error }
-  );
+  triggerPageProcessing(req.nextUrl.origin);
 
-  return NextResponse.json({ job: completedJob, results: responseResults });
+  return NextResponse.json({ job: processingJob });
 }
