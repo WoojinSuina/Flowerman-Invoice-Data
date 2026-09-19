@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
+import { RetryFailedPageButton } from "@/components/jobs/RetryFailedPageButton";
 
 function ScannedImage({ url, alt }: { url: string; alt: string }) {
   return url.endsWith(".pdf") ? (
@@ -141,6 +142,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                 <th className="py-2 pr-4">Page</th>
                 <th className="py-2 pr-4">Scanned image</th>
                 <th className="py-2 pr-4">Error</th>
+                <th className="py-2 pr-4">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -159,6 +161,14 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                     />
                   </td>
                   <td className="py-2 pr-4 text-red-700">{attempt.errorMessage}</td>
+                  <td className="py-2 pr-4">
+                    {attempt.sourceImageUrl && (
+                      <RetryFailedPageButton
+                        url={attempt.sourceImageUrl}
+                        page={attempt.sourcePage}
+                      />
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

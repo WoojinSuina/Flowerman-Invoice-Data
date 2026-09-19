@@ -173,18 +173,18 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       )
     );
 
-    const productIdByName = new Map(
-      await Promise.all(
-        [...new Set(result.items.map((item) => item.productName))].map(async (name) => {
-          const product = await prisma.product.upsert({
-            where: { name },
-            update: {},
-            create: { name },
-          });
-          return [name, product.id] as const;
-        })
-      )
-    );
+    // Sequential, not Promise.all — an invoice with many distinct products
+    // used to fire that many concurrent connections at once, which is
+    // exactly the kind of burst that exhausts a connection-pooled database.
+    const productIdByName = new Map<string, string>();
+    for (const name of new Set(result.items.map((item) => item.productName))) {
+      const product = await prisma.product.upsert({
+        where: { name },
+        update: {},
+        create: { name },
+      });
+      productIdByName.set(name, product.id);
+    }
 
     // A delivery invoice can never be dated after today — this is a hard
     // fact, not a heuristic. Almost always a month/day swap on a scan where

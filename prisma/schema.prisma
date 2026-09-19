@@ -7,8 +7,17 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Transaction-mode pooler (port 6543) — many short-lived queries share a
+  // small number of real Postgres connections, instead of each Prisma
+  // connection holding its own session-mode slot. Session-mode (port 5432,
+  // 15-connection hard cap on Supabase) was getting exhausted by ordinary
+  // concurrent queries during a batch upload.
+  url       = env("DATABASE_URL")
+  // Session-mode connection, used only for schema migrations (advisory
+  // locks and other session-level features aren't available through a
+  // transaction pooler).
+  directUrl = env("DIRECT_URL")
 }
 
 enum ValidationStatus {

@@ -30,6 +30,7 @@ interface UploadQueueContextValue {
   queue: QueueItem[];
   processing: boolean;
   addFiles: (fileList: FileList | null) => void;
+  addFile: (file: File) => void;
   removeItem: (id: string) => void;
   processQueue: () => Promise<void>;
 }
@@ -77,6 +78,10 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
     setQueue((q) => [...q, ...items]);
   }
 
+  function addFile(file: File) {
+    setQueue((q) => [...q, { id: `f${nextId++}`, file, status: "queued" }]);
+  }
+
   function removeItem(id: string) {
     setQueue((q) => q.filter((item) => item.id !== id));
   }
@@ -112,7 +117,9 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <UploadQueueContext.Provider value={{ queue, processing, addFiles, removeItem, processQueue }}>
+    <UploadQueueContext.Provider
+      value={{ queue, processing, addFiles, addFile, removeItem, processQueue }}
+    >
       {children}
     </UploadQueueContext.Provider>
   );

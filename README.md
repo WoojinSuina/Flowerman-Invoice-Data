@@ -100,6 +100,29 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   corrected date is still in the future. No migration needed since
   `invoiceDate` already existed; this only changes when/how it can be
   edited and what forces review.
+- **Database connection: split pooled vs. direct URL.** `DATABASE_URL` was
+  pointed at Supabase's session-mode pooler (port 5432), which hard-caps at
+  15 connections *project-wide* — ordinary concurrent queries during a
+  batch upload (Prisma's own client already opens several connections, and
+  `processInvoicePage.ts` used to upsert every distinct product on an
+  invoice concurrently, one connection each) exhausted it in practice,
+  surfacing as `FATAL: (EMAXCONNSESSION) max clients reached in session
+  mode`. `DATABASE_URL` now points at the transaction-mode pooler (port
+  6543, `?pgbouncer=true`) instead, which multiplexes many short queries
+  over a small number of real connections; a new `DIRECT_URL` (session-mode,
+  the old value) is used only by `prisma migrate`, since advisory locks and
+  other session-level features aren't available through a transaction
+  pooler. The per-invoice product upserts are also now sequential instead
+  of `Promise.all`, so a single invoice can no longer burst many
+  connections at once regardless of which pooler is in front.
+- **Retry a single failed page without hunting for it.** A failed page's
+  file is already sitting in Storage (see `sourceImageUrl` above) — the
+  Jobs detail page's "Failed pages" table now has a "Retry this page"
+  button (`RetryFailedPageButton`) that fetches that exact file back and
+  drops it into the same upload queue as everything else
+  (`UploadQueueProvider` gained a single-file `addFile()` alongside the
+  existing `addFiles()`), instead of asking the user to relocate and
+  re-select the original file from a batch of hundreds.
 
 ## What's built (Phase 3)
 
@@ -289,7 +312,8 @@ npm run db:generate
 
 | Variable | Required | Source |
 |---|---|---|
-| `DATABASE_URL` | Yes | Supabase → Project Settings → Database → Connection string |
+| `DATABASE_URL` | Yes | Supabase → Project Settings → Database → Connection string → **Transaction** pooler (port 6543); append `?pgbouncer=true` |
+| `DIRECT_URL` | Yes | Same page → **Session** pooler (port 5432) connection string. Used only by `prisma migrate` — the transaction pooler above doesn't support the session-level features migrations need. |
 | `ANTHROPIC_API_KEY` | Yes | console.anthropic.com |
 | `SUPABASE_URL` | Yes (Phase 2) | Supabase → Project Settings → API → Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (Phase 2) | Supabase → Project Settings → API → `service_role` secret |
