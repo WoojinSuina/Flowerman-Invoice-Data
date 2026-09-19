@@ -419,6 +419,14 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="border-t-2 font-medium">
+              <td className="py-1 pr-2" colSpan={5}>
+                Total (calculated)
+              </td>
+              <td className="py-1 pr-2">{formatCents(liveValidation.calculatedTotalCreditCents)}</td>
+            </tr>
+          </tfoot>
         </table>
 
         {liveValidation.suggestions.length > 0 && (
