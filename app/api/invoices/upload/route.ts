@@ -75,13 +75,19 @@ export async function POST(req: NextRequest) {
     });
     results.push(result);
 
+    // "APPROVED" here always means an exact-$0.00-difference invoice that
+    // processInvoicePage auto-approved at creation (a PASS, just skipped
+    // the manual click) — count it as passed, not as an unaccounted-for
+    // fourth bucket, so passed+review+failed always sums to processed.
+    const isPassed =
+      result.ok &&
+      (result.invoice.validationStatus === "PASS" ||
+        result.invoice.validationStatus === "APPROVED");
     await prisma.processingJob.update({
       where: { id: job.id },
       data: {
         processedPages: { increment: 1 },
-        passedPages: {
-          increment: result.ok && result.invoice.validationStatus === "PASS" ? 1 : 0,
-        },
+        passedPages: { increment: isPassed ? 1 : 0 },
         reviewPages: {
           increment: result.ok && result.invoice.validationStatus === "REVIEW" ? 1 : 0,
         },
