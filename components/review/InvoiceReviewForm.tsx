@@ -27,7 +27,16 @@ interface ReviewInvoice {
   totalCreditCents: number;
   totalAmountDueCents: number;
   items: ReviewItem[];
-  duplicateOf?: { id: string; invoiceNumber: string } | null;
+  duplicateOf?: { id: string; invoiceNumber: string; sourceImageUrl: string | null } | null;
+}
+
+function ScannedImage({ url, alt }: { url: string; alt: string }) {
+  return url.endsWith(".pdf") ? (
+    <PdfPageImage src={url} alt={alt} />
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt={alt} className="w-full rounded border object-contain" />
+  );
 }
 
 function MoneyInput({
@@ -188,25 +197,43 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             </a>
           </div>
         )}
-        {invoice.sourceImageUrl ? (
-          invoice.sourceImageUrl.endsWith(".pdf") ? (
-            <PdfPageImage
-              src={invoice.sourceImageUrl}
-              alt={`Scanned invoice ${invoice.invoiceNumber}`}
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={invoice.sourceImageUrl}
-              alt={`Scanned invoice ${invoice.invoiceNumber}`}
-              className="w-full rounded border object-contain"
-            />
-          )
-        ) : (
-          <div className="flex h-64 items-center justify-center rounded border bg-gray-100 text-gray-500">
-            No scanned image available
+        <div className={invoice.duplicateOf ? "grid grid-cols-2 gap-3" : undefined}>
+          <div>
+            {invoice.duplicateOf && (
+              <p className="mb-1 text-xs text-gray-500">This scan</p>
+            )}
+            {invoice.sourceImageUrl ? (
+              <ScannedImage
+                url={invoice.sourceImageUrl}
+                alt={`Scanned invoice ${invoice.invoiceNumber}`}
+              />
+            ) : (
+              <div className="flex h-64 items-center justify-center rounded border bg-gray-100 text-gray-500">
+                No scanned image available
+              </div>
+            )}
           </div>
-        )}
+          {invoice.duplicateOf && (
+            <div>
+              <p className="mb-1 text-xs text-gray-500">
+                Already on file:{" "}
+                <Link href={`/review/${invoice.duplicateOf.id}`} className="underline">
+                  #{invoice.duplicateOf.invoiceNumber}
+                </Link>
+              </p>
+              {invoice.duplicateOf.sourceImageUrl ? (
+                <ScannedImage
+                  url={invoice.duplicateOf.sourceImageUrl}
+                  alt={`Existing invoice ${invoice.duplicateOf.invoiceNumber}`}
+                />
+              ) : (
+                <div className="flex h-64 items-center justify-center rounded border bg-gray-100 text-gray-500">
+                  No scanned image available
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {!expanded && <div>
@@ -228,8 +255,9 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             <Link href={`/review/${invoice.duplicateOf.id}`} className="underline">
               #{invoice.duplicateOf.invoiceNumber}
             </Link>{" "}
-            at this store has the same date and total amount due — check whether
-            this is a separate delivery or an accidental re-scan before approving.
+            at this store has the same date and matches on total amount due or
+            line items — check whether this is a separate delivery or an
+            accidental re-scan before approving.
           </div>
         )}
 

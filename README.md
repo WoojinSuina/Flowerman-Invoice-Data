@@ -53,24 +53,29 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   error (`An invoice numbered X already exists for this store — likely a
   duplicate scan`) instead of the raw Prisma constraint message. That
   constraint can't catch a re-scan that OCR reads slightly differently
-  though, so `processInvoicePage.ts` also checks for another invoice at the
-  same store with the same date and the same total amount due but a
-  *different* number; a hit sets `Invoice.possibleDuplicateOfId` (plain id,
-  no relation, looked up manually — same pattern as other cross-model joins
-  in this app) and forces `REVIEW` even if the math otherwise reconciled,
-  since a possible duplicate is exactly the kind of exception a human needs
-  to resolve. `InvoiceReviewForm` shows this as a banner linking to the
-  other invoice. There's no delete/merge action for confirmed duplicates
-  yet — the human resolves it by editing one of the two, the same as any
-  other REVIEW exception.
-- **Failed pages keep their scanned image.** `ExtractionAttempt.sourceImageUrl`
-  is set whenever a page's file made it to Supabase Storage before something
-  later failed (e.g. the duplicate-scan rejection above) — extraction/upload
-  failures never reach that point, so it stays null for those, which is
-  correct since there's no file to show. `/jobs/[id]`'s "Failed pages" table
-  renders it (via the same `PdfPageImage` component the review page uses)
-  so a failure can be visually confirmed against the actual scan instead of
-  just an error string.
+  though, so `processInvoicePage.ts` also checks every other invoice at the
+  same store on the same date and flags one as a possible duplicate if it
+  matches on **either** the total amount due **or** the exact set of line
+  items (product, delivered, returned, unit cost) — matching on items too
+  catches a re-scan where OCR misread the total differently between the two
+  reads but got the same products/quantities both times. A hit sets
+  `Invoice.possibleDuplicateOfId` (plain id, no relation, looked up manually
+  — same pattern as other cross-model joins in this app) and forces `REVIEW`
+  even if the math otherwise reconciled, since a possible duplicate is
+  exactly the kind of exception a human needs to resolve. There's no
+  delete/merge action for confirmed duplicates yet — the human resolves it
+  by editing one of the two, the same as any other REVIEW exception.
+- **Failed pages, and possible duplicates, show both scans side by side.**
+  `ExtractionAttempt.sourceImageUrl` is set whenever a page's file made it to
+  Supabase Storage before something later failed (e.g. the duplicate-scan
+  rejection above) — extraction/upload failures never reach that point, so
+  it stays null for those, correctly, since there's no file to show. A hard
+  duplicate also sets `ExtractionAttempt.duplicateOfInvoiceId`, pointing at
+  the invoice it collided with (plain id, no relation). `/jobs/[id]`'s
+  "Failed pages" table and `InvoiceReviewForm`'s possible-duplicate banner
+  both render the current scan next to the existing one (via the same
+  `PdfPageImage` component) so a duplicate can be visually confirmed against
+  the actual scans instead of just an error string or invoice number.
 
 ## What's built (Phase 3)
 

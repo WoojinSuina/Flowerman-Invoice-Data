@@ -38,6 +38,37 @@ async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   });
 }
 
+interface DuplicateCandidateItem {
+  productName: string;
+  deliveredQuantity: number;
+  returnedQuantity: number;
+  unitCostCents: number;
+}
+
+function lineItemKey(item: DuplicateCandidateItem): string {
+  return `${item.productName}|${item.deliveredQuantity}|${item.returnedQuantity}|${item.unitCostCents}`;
+}
+
+/**
+ * Same store + same date isn't enough on its own to call two invoices a
+ * duplicate (a store can get two real deliveries on the same day) — but
+ * matching on the total OR on the exact same set of line items (product,
+ * delivered, returned, unit cost) is a strong enough signal either way.
+ * Checking items too (not just the dollar total) catches a re-scan where
+ * OCR misread the total differently between the two reads but got the same
+ * products/quantities both times.
+ */
+function isLikelyDuplicate(
+  candidate: { totalAmountDueCents: number; items: DuplicateCandidateItem[] },
+  extractedTotalAmountDueCents: number,
+  extractedItems: DuplicateCandidateItem[]
+): boolean {
+  if (candidate.totalAmountDueCents === extractedTotalAmountDueCents) return true;
+  if (candidate.items.length !== extractedItems.length) return false;
+  const candidateKeys = new Set(candidate.items.map(lineItemKey));
+  return extractedItems.every((item) => candidateKeys.has(lineItemKey(item)));
+}
+
 export interface ProcessPageInput {
   buffer: Buffer;
   mimeType: string;
@@ -82,6 +113,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     return { ok: false, sourcePage, error: `Extraction failed: ${message}` };
   }
 
+  let store: Store | undefined;
   let uploadedFile;
   try {
     uploadedFile = await uploadInvoiceFile(buffer, mimeType);
@@ -106,20 +138,39 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     const validationInput = toValidationInput(extracted);
     const result = validateInvoice(validationInput);
 
-    const store = await resolveStore(extracted);
+    store = await resolveStore(extracted);
 
     // Catches a re-scan that OCR reads slightly differently (so the exact
     // invoiceNumber+storeId unique constraint below wouldn't catch it): same
-    // store, same date, same total, but a different invoice number.
-    const possibleDuplicate = await prisma.invoice.findFirst({
+    // store, same date, and either the same total or the same set of line
+    // items, but a different invoice number.
+    const sameStoreDateCandidates = await prisma.invoice.findMany({
       where: {
         storeId: store.id,
         invoiceDate: new Date(extracted.invoiceDate),
-        totalAmountDueCents: dollarsToCents(extracted.totalAmountDue),
         invoiceNumber: { not: extracted.invoiceNumber },
       },
-      select: { id: true, invoiceNumber: true },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        totalAmountDueCents: true,
+        items: {
+          select: {
+            productName: true,
+            deliveredQuantity: true,
+            returnedQuantity: true,
+            unitCostCents: true,
+          },
+        },
+      },
     });
+    const possibleDuplicate = sameStoreDateCandidates.find((candidate) =>
+      isLikelyDuplicate(
+        candidate,
+        dollarsToCents(extracted.totalAmountDue),
+        result.items
+      )
+    );
 
     const productIdByName = new Map(
       await Promise.all(
@@ -217,6 +268,15 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     const message = isDuplicateInvoiceNumber
       ? `An invoice numbered ${extracted.invoiceNumber} already exists for this store — likely a duplicate scan.`
       : `Persisting invoice failed: ${(err as Error).message}`;
+
+    const collidingInvoice =
+      isDuplicateInvoiceNumber && store
+        ? await prisma.invoice.findFirst({
+            where: { invoiceNumber: extracted.invoiceNumber, storeId: store.id },
+            select: { id: true },
+          })
+        : null;
+
     await prisma.extractionAttempt.create({
       data: {
         provider: extractor.providerName,
@@ -229,6 +289,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         // Invoice row is what threw), so it's still viewable even though no
         // Invoice was ever created for it.
         sourceImageUrl: uploadedFile.url,
+        duplicateOfInvoiceId: collidingInvoice?.id ?? null,
       },
     });
     return { ok: false, sourcePage, error: message };

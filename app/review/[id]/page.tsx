@@ -19,7 +19,7 @@ export default async function ReviewDetailPage(props: { params: Promise<{ id: st
   const duplicateOf = invoice.possibleDuplicateOfId
     ? await prisma.invoice.findUnique({
         where: { id: invoice.possibleDuplicateOfId },
-        select: { id: true, invoiceNumber: true },
+        select: { id: true, invoiceNumber: true, sourceImageUrl: true },
       })
     : null;
 

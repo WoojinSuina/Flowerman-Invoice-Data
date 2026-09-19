@@ -5,11 +5,7 @@ import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
 
-function FailedPageImage({ url, page }: { url: string | null; page: number | null }) {
-  if (!url) {
-    return <span className="text-xs text-gray-400">No image available</span>;
-  }
-  const alt = `Scanned page ${page ?? "?"}`;
+function ScannedImage({ url, alt }: { url: string; alt: string }) {
   return url.endsWith(".pdf") ? (
     <div className="w-48">
       <PdfPageImage src={url} alt={alt} />
@@ -17,6 +13,46 @@ function FailedPageImage({ url, page }: { url: string | null; page: number | nul
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt={alt} className="w-48 rounded border object-contain" />
+  );
+}
+
+function FailedPageImage({
+  url,
+  page,
+  existing,
+}: {
+  url: string | null;
+  page: number | null;
+  existing: { id: string; invoiceNumber: string; sourceImageUrl: string | null } | null;
+}) {
+  if (!url) {
+    return <span className="text-xs text-gray-400">No image available</span>;
+  }
+  return (
+    <div className="flex gap-3">
+      <div>
+        <p className="mb-1 text-xs text-gray-500">This scan</p>
+        <ScannedImage url={url} alt={`Scanned page ${page ?? "?"}`} />
+      </div>
+      {existing && (
+        <div>
+          <p className="mb-1 text-xs text-gray-500">
+            Already on file:{" "}
+            <Link href={`/review/${existing.id}`} className="text-blue-600 underline">
+              #{existing.invoiceNumber}
+            </Link>
+          </p>
+          {existing.sourceImageUrl ? (
+            <ScannedImage
+              url={existing.sourceImageUrl}
+              alt={`Existing invoice ${existing.invoiceNumber}`}
+            />
+          ) : (
+            <span className="text-xs text-gray-400">No image available</span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -33,6 +69,19 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
   if (!job) {
     notFound();
   }
+
+  const duplicateOfIds = [
+    ...new Set(
+      job.extractionAttempts
+        .map((a) => a.duplicateOfInvoiceId)
+        .filter((id): id is string => id !== null)
+    ),
+  ];
+  const duplicateOfInvoices = await prisma.invoice.findMany({
+    where: { id: { in: duplicateOfIds } },
+    select: { id: true, invoiceNumber: true, sourceImageUrl: true },
+  });
+  const duplicateOfById = new Map(duplicateOfInvoices.map((inv) => [inv.id, inv]));
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -99,7 +148,15 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                 <tr key={attempt.id} className="border-b">
                   <td className="py-2 pr-4">{attempt.sourcePage}</td>
                   <td className="py-2 pr-4">
-                    <FailedPageImage url={attempt.sourceImageUrl} page={attempt.sourcePage} />
+                    <FailedPageImage
+                      url={attempt.sourceImageUrl}
+                      page={attempt.sourcePage}
+                      existing={
+                        attempt.duplicateOfInvoiceId
+                          ? (duplicateOfById.get(attempt.duplicateOfInvoiceId) ?? null)
+                          : null
+                      }
+                    />
                   </td>
                   <td className="py-2 pr-4 text-red-700">{attempt.errorMessage}</td>
                 </tr>
