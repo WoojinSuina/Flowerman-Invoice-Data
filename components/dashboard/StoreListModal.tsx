@@ -19,7 +19,7 @@ function formatPercent(percent: number | null): string {
   return percent === null ? "—" : `${percent.toFixed(0)}%`;
 }
 
-export function StoreListModal({ stores }: { stores: StoreRow[] }) {
+export function StoreListModal({ stores, month }: { stores: StoreRow[]; month: string }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -67,7 +67,10 @@ export function StoreListModal({ stores }: { stores: StoreRow[] }) {
                   {stores.map((s) => (
                     <tr key={s.storeId} className="border-b">
                       <td className="py-2 pr-4">
-                        <Link href={`/stores/${s.storeId}`} className="text-blue-600 underline">
+                        <Link
+                          href={`/review?store=${s.storeId}&month=${month}`}
+                          className="text-blue-600 underline"
+                        >
                           {s.storeName}
                         </Link>
                         {s.storeAddress && (

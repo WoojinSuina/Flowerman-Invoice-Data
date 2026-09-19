@@ -9,6 +9,7 @@ import {
   monthParam,
   formatMonthLabel,
   getWeekStart,
+  weekParam,
   formatWeekLabel,
 } from "@/lib/dates";
 
@@ -201,7 +202,9 @@ export default async function DashboardPage(props: {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="font-medium">Top stores</h2>
-            {topStoresRaw.length > 0 && <StoreListModal stores={allStoresEnriched} />}
+            {topStoresRaw.length > 0 && (
+              <StoreListModal stores={allStoresEnriched} month={monthParam(monthStart)} />
+            )}
           </div>
           {topFiveStores.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
@@ -223,7 +226,10 @@ export default async function DashboardPage(props: {
                   return (
                     <tr key={row.storeId} className="border-b">
                       <td className="py-2 pr-4">
-                        <Link href={`/stores/${row.storeId}`} className="text-blue-600 underline">
+                        <Link
+                          href={`/review?store=${row.storeId}&month=${monthParam(monthStart)}`}
+                          className="text-blue-600 underline"
+                        >
                           {store?.name ?? row.storeId}
                         </Link>
                         {store?.address && (
@@ -298,7 +304,14 @@ export default async function DashboardPage(props: {
               {weeklyRevenue.map((week) => (
                 <tr key={week.weekStart.toISOString()} className="border-b">
                   <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
-                  <td className="py-2 pr-4 tabular-nums">{week.count}</td>
+                  <td className="py-2 pr-4 tabular-nums">
+                    <Link
+                      href={`/review?week=${weekParam(week.weekStart)}`}
+                      className="text-blue-600 underline"
+                    >
+                      {week.count}
+                    </Link>
+                  </td>
                   <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
                 </tr>
               ))}
