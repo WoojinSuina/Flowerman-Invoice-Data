@@ -6,20 +6,30 @@ import { NavBar } from "@/components/NavBar";
 import type { ValidationStatus } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL")[] = ["REVIEW", "PASS", "APPROVED", "FAILED", "ALL"];
+const PAGE_SIZE = 25;
 
 export default async function ReviewListPage(
   props: {
-    searchParams: Promise<{ status?: string }>;
+    searchParams: Promise<{ status?: string; page?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
   const status = searchParams.status ?? "REVIEW";
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
-  const invoices = await prisma.invoice.findMany({
-    where: status === "ALL" ? undefined : { validationStatus: status as ValidationStatus },
-    include: { store: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const where = status === "ALL" ? undefined : { validationStatus: status as ValidationStatus };
+
+  const [invoices, totalCount] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      include: { store: true },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.invoice.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -78,6 +88,38 @@ export default async function ReviewListPage(
             ))}
           </tbody>
         </table>
+      )}
+
+      {totalCount > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Page {page} of {totalPages} ({totalCount} invoice{totalCount === 1 ? "" : "s"})
+          </span>
+          <div className="flex gap-2">
+            <Link
+              href={`/review?status=${status}&page=${page - 1}`}
+              aria-disabled={page <= 1}
+              className={`rounded px-3 py-1 ${
+                page <= 1
+                  ? "pointer-events-none bg-gray-100 text-gray-300"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Previous
+            </Link>
+            <Link
+              href={`/review?status=${status}&page=${page + 1}`}
+              aria-disabled={page >= totalPages}
+              className={`rounded px-3 py-1 ${
+                page >= totalPages
+                  ? "pointer-events-none bg-gray-100 text-gray-300"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Next
+            </Link>
+          </div>
+        </div>
       )}
     </main>
   );
