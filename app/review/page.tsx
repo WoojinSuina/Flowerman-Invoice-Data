@@ -23,7 +23,7 @@ export default async function ReviewListPage(
     prisma.invoice.findMany({
       where,
       include: { store: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
