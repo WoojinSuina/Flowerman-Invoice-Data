@@ -47,10 +47,27 @@ async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   }
 
   if (existing) {
-    return prisma.store.update({
-      where: { id: existing.id },
-      data: { name, address: address ?? existing.address, storeNumber: extracted.storeNumber },
-    });
+    // Real bug, confirmed live: overwriting name/address with every fresh
+    // extraction let a single noisier read (e.g. "RESTAURANT" -> "RTAURANT")
+    // corrupt the stored identity, which then made the NEXT, correctly-read
+    // scan of the same invoice fail to match this row at all (both the
+    // exact lookup and the normalized fallback above key on name) and spawn
+    // a brand new Store row — the same invoice got created three separate
+    // times before this was caught. Identity now stays stable once set;
+    // only fills in an address that was previously missing (the one case
+    // the original design needed this for), and always keeps storeNumber
+    // current since it's purely informational, never part of the identity.
+    const needsAddress = !existing.address && address;
+    if (needsAddress || existing.storeNumber !== extracted.storeNumber) {
+      return prisma.store.update({
+        where: { id: existing.id },
+        data: {
+          storeNumber: extracted.storeNumber,
+          ...(needsAddress ? { address } : {}),
+        },
+      });
+    }
+    return existing;
   }
 
   return prisma.store.create({
