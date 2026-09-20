@@ -21,13 +21,6 @@ APP_URL="${APP_URL:-}"
 UPLOAD_TOKEN="${UPLOAD_TOKEN:-}"
 MIN_AGE_SECONDS="${MIN_AGE_SECONDS:-10}"
 LOG_FILE="${LOG_FILE:-$HOME/Library/Logs/flowerman-scan-uploader.log}"
-# After a successful upload, wait for extraction to finish and pop up a
-# native notification with the invoice's total due - the point being
-# someone scanning an invoice can cross-check it against cash in hand
-# without opening the app at all. Set NOTIFY_ON_COMPLETE=0 to disable.
-NOTIFY_ON_COMPLETE="${NOTIFY_ON_COMPLETE:-1}"
-NOTIFY_POLL_INTERVAL_SECONDS="${NOTIFY_POLL_INTERVAL_SECONDS:-3}"
-NOTIFY_POLL_MAX_SECONDS="${NOTIFY_POLL_MAX_SECONDS:-90}"
 
 CONFIG_FILE="$HOME/.flowerman-scan-uploader.env"
 if [ -f "$CONFIG_FILE" ]; then
@@ -75,77 +68,6 @@ extract_json_field() {
   # Only safe for this app's own simple, controlled JSON responses (no
   # nested objects, no escaped quotes in values) — not a general parser.
   echo "$2" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"
-}
-
-extract_json_number_field() {
-  # Same caveat as extract_json_field, for an unquoted numeric value.
-  echo "$2" | sed -n "s/.*\"$1\":\(-\{0,1\}[0-9]\{1,\}\).*/\1/p"
-}
-
-# Cents -> "$12.34" (or "-$12.34"), using only bash builtins.
-format_cents() {
-  local cents="$1" sign=""
-  if [ "$cents" -lt 0 ]; then
-    sign="-"
-    cents=$(( -cents ))
-  fi
-  printf '%s$%d.%02d' "$sign" "$(( cents / 100 ))" "$(( cents % 100 ))"
-}
-
-# Polls .../summary until the job reaches a terminal status, then prints
-# the JSON response (for notify_result to read). Prints nothing on
-# timeout. Never fails the whole script - a slow or missed notification
-# shouldn't affect the upload, which already succeeded by this point.
-poll_job_summary() {
-  local job_id="$1" waited=0 response status
-  while [ "$waited" -lt "$NOTIFY_POLL_MAX_SECONDS" ]; do
-    response=$(curl -sS -X GET "$APP_URL/api/jobs/$job_id/summary" -H "x-upload-token: $UPLOAD_TOKEN" 2>/dev/null) || response=""
-    status=$(extract_json_field "status" "$response")
-    case "$status" in
-      COMPLETED | COMPLETED_WITH_ERRORS | FAILED)
-        echo "$response"
-        return 0
-        ;;
-    esac
-    sleep "$NOTIFY_POLL_INTERVAL_SECONDS"
-    waited=$(( waited + NOTIFY_POLL_INTERVAL_SECONDS ))
-  done
-  return 1
-}
-
-notify() {
-  # osascript ships with every Mac - no extra install needed. Notification
-  # failures (e.g. Do Not Disturb, no display session) are never fatal.
-  osascript -e "display notification \"$2\" with title \"$1\"" >/dev/null 2>&1 || true
-}
-
-notify_result() {
-  local filename="$1" job_id="$2" summary
-  summary=$(poll_job_summary "$job_id") || {
-    notify "Scan uploaded: $filename" "Still processing — check Jobs in the app shortly."
-    return
-  }
-
-  local invoice_number total_cents review_status
-  invoice_number=$(extract_json_field "invoiceNumber" "$summary")
-  total_cents=$(extract_json_number_field "totalAmountDueCents" "$summary")
-  review_status=$(extract_json_field "validationStatus" "$summary")
-
-  if [ -z "$total_cents" ]; then
-    # No invoice was created - almost always a duplicate-scan rejection.
-    local error_message
-    error_message=$(extract_json_field "errorMessage" "$summary")
-    notify "Scan not added: $filename" "${error_message:-Could not read this invoice — check the app.}"
-    return
-  fi
-
-  local amount
-  amount=$(format_cents "$total_cents")
-  local suffix=""
-  if [ "$review_status" != "PASS" ] && [ "$review_status" != "APPROVED" ]; then
-    suffix=" (flagged for review)"
-  fi
-  notify "Invoice #$invoice_number" "Total due: $amount$suffix"
 }
 
 upload_one() {
@@ -213,10 +135,6 @@ upload_one() {
   job_id=$(extract_json_field "id" "$complete_body")
   log "OK $filename -> job $job_id"
   mv "$file" "$UPLOADED_DIR/$(date +%Y%m%d-%H%M%S)-$filename"
-
-  if [ "$NOTIFY_ON_COMPLETE" = "1" ]; then
-    notify_result "$filename" "$job_id"
-  fi
 }
 
 now=$(date +%s)

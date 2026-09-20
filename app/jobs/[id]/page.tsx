@@ -113,6 +113,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
               <th className="py-2 pr-4">Invoice #</th>
               <th className="py-2 pr-4">Store</th>
               <th className="py-2 pr-4">Status</th>
+              <th className="py-2 pr-4">Total Due</th>
               <th className="py-2 pr-4">Difference</th>
             </tr>
           </thead>
@@ -129,6 +130,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                 <td className="py-2 pr-4">
                   <StatusBadge status={invoice.validationStatus} />
                 </td>
+                <td className="py-2 pr-4 font-medium">{formatCents(invoice.totalAmountDueCents)}</td>
                 <td className="py-2 pr-4">{formatCents(invoice.validationDifferenceCents)}</td>
               </tr>
             ))}

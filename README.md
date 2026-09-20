@@ -474,12 +474,9 @@ security patches. Notable side effects:
   `UPLOAD_API_TOKEN`. Installs as a macOS LaunchAgent (`launchd`) so it
   starts automatically and reacts to new files via `WatchPaths`, with a
   periodic fallback poll in case a filesystem event is missed. After a
-  successful upload it polls the new `GET /api/jobs/[id]/summary` route
-  (also `UPLOAD_API_TOKEN`-gated) and pops up a native notification with
-  the invoice's total due — the point being someone scanning an invoice
-  can cross-check it against cash in hand without opening the app —
-  or, if the scan was rejected (most often a duplicate), a notification
-  explaining why. See that directory's own README for setup.
+  scan uploads, check the Jobs tab in the app to see the invoice's total
+  once extraction finishes (a few seconds) — e.g. to cross-check against
+  cash in hand. See that directory's own README for setup.
 
 ## What's NOT built yet (by design — see Phases below)
 
