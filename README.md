@@ -552,8 +552,19 @@ npm test
 ## Deployment
 
 Target: Vercel (Next.js) + Supabase (Postgres). Set the same environment
-variables in the Vercel project settings. Run `prisma migrate deploy`
-against production `DATABASE_URL` as part of your deploy step.
+variables in the Vercel project settings (see "Environment variables"
+above, plus `UPLOAD_API_TOKEN` if using the scanner watcher). Run
+`prisma migrate deploy` against production `DATABASE_URL` as part of your
+deploy step — not needed if it's the same Supabase instance already used
+locally, since it's already up to date.
+
+`package.json` has a `postinstall: prisma generate` script — required on
+Vercel specifically: Vercel caches `node_modules` between builds, which
+can skip `@prisma/client`'s own install-time generation and leave a stale
+client, surfacing as `PrismaClientInitializationError` at build time
+("this project was built on Vercel, which caches dependencies..."). The
+explicit `postinstall` script forces regeneration on every build
+regardless of the cache.
 
 ## Development Phases
 
