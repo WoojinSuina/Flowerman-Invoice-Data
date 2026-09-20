@@ -10,10 +10,13 @@ const INTERNALLY_TRIGGERED_PATHS = new Set(["/api/jobs/process-next"]);
 
 // Unattended external clients (the scanner watcher script on another
 // computer, with no browser session to carry a cookie) authenticate
-// uploads with a dedicated token instead — separate from AUTH_SECRET so
-// it can be rotated independently without changing the login password.
+// uploads — and polling for the result, so it can pop up the total due as
+// a notification — with a dedicated token instead, separate from
+// AUTH_SECRET so it can be rotated independently without changing the
+// login password.
 const UPLOAD_TOKEN_HEADER = "x-upload-token";
 const UPLOAD_PATHS = new Set(["/api/invoices/upload/init", "/api/invoices/upload/complete"]);
+const JOB_SUMMARY_PATH = /^\/api\/jobs\/[^/]+\/summary$/;
 
 export function proxy(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE)?.value;
@@ -34,7 +37,7 @@ export function proxy(request: NextRequest) {
   const uploadToken = process.env.UPLOAD_API_TOKEN;
   if (
     uploadToken &&
-    UPLOAD_PATHS.has(request.nextUrl.pathname) &&
+    (UPLOAD_PATHS.has(request.nextUrl.pathname) || JOB_SUMMARY_PATH.test(request.nextUrl.pathname)) &&
     request.headers.get(UPLOAD_TOKEN_HEADER) === uploadToken
   ) {
     return NextResponse.next();

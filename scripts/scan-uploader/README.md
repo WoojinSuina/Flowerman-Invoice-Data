@@ -6,6 +6,12 @@ automatically, using the same fast upload path the web UI uses (see the
 main README's "Direct-to-Storage uploads" section) — just triggered by a
 new file appearing instead of a browser click.
 
+Once uploaded, it waits for extraction to finish and pops up a native
+macOS notification with the invoice's total due — so whoever's scanning
+can immediately cross-check that total against cash in hand without
+opening the app at all. If the scan gets rejected instead (most often a
+duplicate — the same invoice already on file), the notification shows why.
+
 Dependency-free by design: only `bash` and `curl`, both already on macOS.
 No Node, Python, or Homebrew install needed on a computer that isn't
 otherwise a dev machine.
@@ -45,7 +51,10 @@ otherwise a dev machine.
    move into `WATCH_DIR/uploaded/`. If something's wrong, the log line
    explains what failed (bad token, unreachable URL, wrong file type,
    etc.) and the file moves to `WATCH_DIR/failed/` instead of retrying
-   forever.
+   forever. A few seconds after the `OK` line, a notification should pop
+   up with the invoice's total due (or, if it's a duplicate, an
+   explanation instead) — set `NOTIFY_ON_COMPLETE=0` in the config to turn
+   this off if it's not wanted.
 5. Install the LaunchAgent so it runs automatically from now on:
    ```bash
    mkdir -p ~/Library/LaunchAgents
@@ -59,8 +68,9 @@ otherwise a dev machine.
    launchctl load ~/Library/LaunchAgents/com.flowerman.scanuploader.plist
    ```
 6. Scan something. It should upload within a few seconds — `WatchPaths`
-   triggers a run as soon as the file appears, with a 5-minute timer as a
-   fallback in case that event is ever missed. Check the log file if not.
+   triggers a run as soon as the file appears, with a 1-minute timer as a
+   fallback in case that event is ever missed — followed shortly by a
+   notification with the total due. Check the log file if not.
 
 ## Checking on it later
 
