@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MergeStoreButton } from "@/components/stores/MergeStoreButton";
+import { StoreTypeBadge } from "@/components/stores/StoreTypeBadge";
+import { isConsignmentStore } from "@/lib/stores";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -32,6 +34,7 @@ export default async function StoresListPage() {
             <tr className="border-b text-left text-gray-500">
               <th className="py-2 pr-4">Store</th>
               <th className="py-2 pr-4">Store #</th>
+              <th className="py-2 pr-4">Type</th>
               <th className="py-2 pr-4">Invoices</th>
               <th className="py-2 pr-4">Revenue</th>
               <th className="py-2 pr-4">Duplicate?</th>
@@ -54,6 +57,9 @@ export default async function StoresListPage() {
                     )}
                   </td>
                   <td className="py-2 pr-4">{store.storeNumber}</td>
+                  <td className="py-2 pr-4">
+                    <StoreTypeBadge consignment={isConsignmentStore(store)} />
+                  </td>
                   <td className="py-2 pr-4 tabular-nums">{agg?._count ?? 0}</td>
                   <td className="py-2 pr-4 tabular-nums">
                     {formatCents(agg?._sum.calculatedAmountDueCents ?? 0)}

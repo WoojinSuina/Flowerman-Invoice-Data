@@ -400,6 +400,21 @@ security patches. Notable side effects:
   and `ExtractionAttempt.rawResponse` still capture exactly what the AI
   said before this correction, never the corrected value.
 
+- **Consignment vs regular stores.** If the printed NAME line ends in "CON"
+  (often with a leading marker — "*CON", "**CON", "#CON"), the store is
+  consignment: an invoice's products were actually delivered the prior
+  cycle, and this invoice is collecting money for those, not for what's
+  physically on the page. Otherwise ("regular"), the money on this invoice
+  is for what's on this invoice — no lag. `lib/stores.ts`'s
+  `isConsignmentStore()` checks both `Store.name` and `Store.address` for
+  the suffix (confirmed against real data: it always lands in the address
+  half of the printed line, never the chain-name half, purely because of
+  where that half happens to end). Surfaced as a "Consignment"/"Regular"
+  badge (`components/stores/StoreTypeBadge.tsx`) on the Stores list and
+  detail pages — 60 of 308 current stores are consignment. Informational
+  only for now; nothing downstream (Dashboard/Reconciliation revenue
+  timing) accounts for the payment lag yet.
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Adding/removing line items during review (corrections only edit existing

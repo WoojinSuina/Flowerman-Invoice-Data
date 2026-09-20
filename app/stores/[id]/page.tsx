@@ -5,6 +5,8 @@ import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
 import { formatInvoiceDate } from "@/lib/dates";
+import { isConsignmentStore } from "@/lib/stores";
+import { StoreTypeBadge } from "@/components/stores/StoreTypeBadge";
 
 export default async function StoreDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -21,7 +23,10 @@ export default async function StoreDetailPage(props: { params: Promise<{ id: str
   return (
     <main className="mx-auto max-w-5xl p-6">
       <NavBar />
-      <h1 className="text-xl font-semibold">{store.name}</h1>
+      <div className="mb-1 flex items-center gap-2">
+        <h1 className="text-xl font-semibold">{store.name}</h1>
+        <StoreTypeBadge consignment={isConsignmentStore(store)} />
+      </div>
       <p className="mb-4 text-sm text-gray-500">
         Store #{store.storeNumber}
         {store.address ? ` · ${store.address}` : ""}
