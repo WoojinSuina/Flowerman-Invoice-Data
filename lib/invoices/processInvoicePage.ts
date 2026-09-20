@@ -6,7 +6,7 @@ import { isLikelyDuplicate } from "@/lib/invoices/duplicateDetection";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
-import { isConsignmentStore } from "@/lib/stores";
+import { isConsignmentStore, normalizeStoreIdentity } from "@/lib/stores";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
 
 /**
@@ -19,14 +19,32 @@ import type { ExtractedInvoice } from "@/lib/extraction/types";
  * address (e.g. both ending up with just the town name). Falls back to
  * matching by number only when no address was extracted at all, so a page
  * with no readable address doesn't spawn a duplicate store on every upload.
+ *
+ * If the exact match misses, falls back to a normalized comparison (see
+ * normalizeStoreIdentity) before creating a new row — confirmed live that
+ * the same real store's trailing consignment marker gets read as "*CON",
+ * "*GON", "TCON", or dropped entirely across different scans, and without
+ * this, each variant spawned its own Store row, splitting one location's
+ * invoice history and letting a genuine re-scan slip past duplicate
+ * detection (which is scoped by storeId).
  */
 async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   const address = extracted.storeAddress?.trim() || null;
   const name = extracted.storeName;
 
-  const existing = address
+  let existing = address
     ? await prisma.store.findUnique({ where: { name_address: { name, address } } })
     : await prisma.store.findFirst({ where: { storeNumber: extracted.storeNumber } });
+
+  if (!existing && address) {
+    const target = normalizeStoreIdentity({ name, address });
+    const sameNameCandidates = await prisma.store.findMany({ where: { name } });
+    existing =
+      sameNameCandidates.find((candidate) => {
+        const normalized = normalizeStoreIdentity({ name: candidate.name, address: candidate.address });
+        return normalized.name === target.name && normalized.address === target.address;
+      }) ?? null;
+  }
 
   if (existing) {
     return prisma.store.update({
