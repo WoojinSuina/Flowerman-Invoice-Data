@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.flowerman.scanuploader</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <!-- REPLACE with the absolute path to upload-watcher.sh on this computer -->
+        <string>/Users/YOUR_USERNAME/flowerman-scan-uploader/upload-watcher.sh</string>
+    </array>
+
+    <!-- Runs immediately whenever a file in the watch folder changes... -->
+    <key>WatchPaths</key>
+    <array>
+        <!-- REPLACE with the same folder as WATCH_DIR in ~/.flowerman-scan-uploader.env -->
+        <string>/Users/YOUR_USERNAME/Scans</string>
+    </array>
+
+    <!-- ...and also on a timer, in case a filesystem event is ever missed -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/flowerman-scan-uploader.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/flowerman-scan-uploader.stderr.log</string>
+</dict>
+</plist>
