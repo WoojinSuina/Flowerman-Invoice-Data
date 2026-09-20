@@ -1,18 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { NavBar } from "@/components/NavBar";
-import { StatusBadge } from "@/components/review/StatusBadge";
-import { PdfPageImage } from "@/components/review/PdfPageImage";
+import { InvoiceGallery } from "@/components/recommendations/InvoiceGallery";
 import { formatInvoiceDate } from "@/lib/dates";
-
-function ScannedThumbnail({ url, alt }: { url: string; alt: string }) {
-  return url.toLowerCase().endsWith(".pdf") ? (
-    <PdfPageImage src={url} alt={alt} />
-  ) : (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt={alt} className="w-full rounded border object-contain" />
-  );
-}
 
 export const dynamic = "force-dynamic";
 
@@ -326,37 +316,15 @@ export default async function RecommendationsPage(props: {
                   ({selectedStoreInvoices.length})
                 </span>
               </h2>
-              {selectedStoreInvoices.length === 0 ? (
-                <p className="text-sm text-gray-500">No scanned invoices for this store yet.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                  {selectedStoreInvoices.map((invoice) => (
-                    <Link
-                      key={invoice.id}
-                      href={`/review/${invoice.id}`}
-                      className="block rounded border p-2 hover:bg-gray-50"
-                    >
-                      {invoice.sourceImageUrl ? (
-                        <ScannedThumbnail
-                          url={invoice.sourceImageUrl}
-                          alt={`Invoice ${invoice.invoiceNumber}`}
-                        />
-                      ) : (
-                        <div className="flex h-32 items-center justify-center rounded border bg-gray-50 text-xs text-gray-400">
-                          No image
-                        </div>
-                      )}
-                      <div className="mt-1 flex items-center justify-between text-xs">
-                        <span className="font-medium text-gray-700">#{invoice.invoiceNumber}</span>
-                        <StatusBadge status={invoice.validationStatus} />
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatInvoiceDate(invoice.invoiceDate)}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              <InvoiceGallery
+                invoices={selectedStoreInvoices.map((invoice) => ({
+                  id: invoice.id,
+                  invoiceNumber: invoice.invoiceNumber,
+                  invoiceDateLabel: formatInvoiceDate(invoice.invoiceDate),
+                  validationStatus: invoice.validationStatus,
+                  sourceImageUrl: invoice.sourceImageUrl,
+                }))}
+              />
             </div>
           )}
         </div>
