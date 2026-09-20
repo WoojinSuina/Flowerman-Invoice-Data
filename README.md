@@ -55,16 +55,24 @@ Philosophy: **AI proposes. Math verifies. Humans resolve exceptions.**
   constraint can't catch a re-scan that OCR reads slightly differently
   though, so `processInvoicePage.ts` also checks every other invoice at the
   same store on the same date and flags one as a possible duplicate if it
-  matches on **either** the total amount due **or** the exact set of line
-  items (product, delivered, returned, unit cost) — matching on items too
-  catches a re-scan where OCR misread the total differently between the two
-  reads but got the same products/quantities both times. A hit sets
-  `Invoice.possibleDuplicateOfId` (plain id, no relation, looked up manually
-  — same pattern as other cross-model joins in this app) and forces `REVIEW`
-  even if the math otherwise reconciled, since a possible duplicate is
-  exactly the kind of exception a human needs to resolve. There's no
-  delete/merge action for confirmed duplicates yet — the human resolves it
-  by editing one of the two, the same as any other REVIEW exception.
+  matches the **exact same set of line items** (product, delivered,
+  returned, unit cost) — a duplicate SCAN of the same physical invoice has
+  the same products both times, even if OCR misread the printed total
+  differently between the two reads. A hit sets `Invoice.possibleDuplicateOfId`
+  (plain id, no relation, looked up manually — same pattern as other
+  cross-model joins in this app) and forces `REVIEW` even if the math
+  otherwise reconciled, since a possible duplicate is exactly the kind of
+  exception a human needs to resolve. There's no delete/merge action for
+  confirmed duplicates yet — the human resolves it by editing one of the
+  two, the same as any other REVIEW exception.
+  - **A total-amount match alone, with different products, is NOT treated
+    as a duplicate signal** (changed after finding a real case: two
+    invoices at the same store/date with completely different products
+    that happened to land on the same dollar total, stuck in REVIEW for
+    no real reason). Two genuinely different real deliveries landing on
+    the same total is far more plausible than the same invoice being
+    scanned twice with an entirely different set of products both times —
+    an invoice like that is now free to PASS on its own math instead.
 - **Failed pages, and possible duplicates, show both scans side by side.**
   `ExtractionAttempt.sourceImageUrl` is set whenever a page's file made it to
   Supabase Storage before something later failed (e.g. the duplicate-scan
