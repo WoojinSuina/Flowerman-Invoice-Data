@@ -62,7 +62,10 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
   const job = await prisma.processingJob.findUnique({
     where: { id: params.id },
     include: {
-      invoices: { include: { store: true }, orderBy: { sourcePage: "asc" } },
+      // Most recently changed first, so approving/correcting an invoice
+      // from this job brings it back to the top instead of leaving it
+      // buried in original page order.
+      invoices: { include: { store: true }, orderBy: { updatedAt: "desc" } },
       extractionAttempts: { where: { succeeded: false }, orderBy: { sourcePage: "asc" } },
     },
   });

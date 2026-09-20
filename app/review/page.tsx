@@ -18,7 +18,7 @@ import {
   findToleranceApprovableInvoiceIds,
   findZeroDiffApprovableInvoiceIds,
 } from "@/lib/reviewFilters";
-import type { ValidationStatus } from "@prisma/client";
+import type { Prisma, ValidationStatus } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL" | "AUTO_APPROVED")[] = [
   "REVIEW",
@@ -59,6 +59,13 @@ export default async function ReviewListPage(props: {
 
   const filterParams = { status, store: storeFilter, month: monthFilter, week: weekFilter };
   const where = buildReviewWhere(filterParams);
+  // Approved invoices are ordered by when they were last touched, not by
+  // invoice date, so approving/correcting one brings it to the top instead
+  // of leaving it wherever its date happens to fall.
+  const orderBy: Prisma.InvoiceOrderByWithRelationInput[] =
+    status === "APPROVED"
+      ? [{ updatedAt: "desc" }]
+      : [{ invoiceDate: "desc" }, { createdAt: "desc" }];
 
   const [
     invoices,
@@ -72,7 +79,7 @@ export default async function ReviewListPage(props: {
       prisma.invoice.findMany({
         where,
         include: { store: true },
-        orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }],
+        orderBy,
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
       }),

@@ -19,7 +19,7 @@ const CLASS_LABELS: Record<MismatchClassification, string> = {
   plausible: "Plausible error",
   likely_misread: "Likely misread",
 };
-const TABLE_LIMIT = 50;
+const PAGE_SIZE = 25;
 
 function StatTile({ label, value, href, sub }: { label: string; value: string; href?: string; sub?: string }) {
   const content = (
@@ -51,11 +51,12 @@ function ClassificationBadge({ classification }: { classification: MismatchClass
 }
 
 export default async function ReconciliationPage(props: {
-  searchParams: Promise<{ status?: string; classification?: string }>;
+  searchParams: Promise<{ status?: string; classification?: string; page?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const statusFilter = (searchParams.status ?? "ALL").toUpperCase();
   const classFilter = (searchParams.classification ?? "ALL") as (typeof CLASS_FILTERS)[number];
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
   const allMismatches = await getMismatchedInvoices();
   const summary = summarizeMismatches(allMismatches);
@@ -63,9 +64,14 @@ export default async function ReconciliationPage(props: {
 
   function buildQuery(overrides: Record<string, string | undefined>) {
     const params = new URLSearchParams();
-    const merged = { status: statusFilter, classification: classFilter, ...overrides };
+    const merged = {
+      status: statusFilter,
+      classification: classFilter,
+      page: String(page),
+      ...overrides,
+    };
     for (const [key, value] of Object.entries(merged)) {
-      if (value && value !== "ALL") params.set(key, value);
+      if (value && value !== "ALL" && !(key === "page" && value === "1")) params.set(key, value);
     }
     const qs = params.toString();
     return `/reconciliation${qs ? `?${qs}` : ""}`;
@@ -75,6 +81,8 @@ export default async function ReconciliationPage(props: {
     .filter((i) => statusFilter === "ALL" || i.validationStatus === statusFilter)
     .filter((i) => classFilter === "ALL" || i.classification === classFilter)
     .sort((a, b) => Math.abs(b.impactCents) - Math.abs(a.impactCents));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -112,7 +120,7 @@ export default async function ReconciliationPage(props: {
         {STATUS_FILTERS.map((f) => (
           <Link
             key={f}
-            href={buildQuery({ status: f })}
+            href={buildQuery({ status: f, page: undefined })}
             className={`rounded px-3 py-1 text-sm ${
               statusFilter === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
@@ -124,7 +132,7 @@ export default async function ReconciliationPage(props: {
         {CLASS_FILTERS.map((f) => (
           <Link
             key={f}
-            href={buildQuery({ classification: f })}
+            href={buildQuery({ classification: f, page: undefined })}
             className={`rounded px-3 py-1 text-sm ${
               classFilter === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
@@ -138,7 +146,7 @@ export default async function ReconciliationPage(props: {
         <h2 className="mb-2 font-medium">
           Largest discrepancies{" "}
           <span className="text-sm font-normal text-gray-400">
-            (top {Math.min(TABLE_LIMIT, filtered.length)} of {filtered.length} by size)
+            (sorted by size, {filtered.length} total)
           </span>
         </h2>
         {filtered.length === 0 ? (
@@ -158,7 +166,7 @@ export default async function ReconciliationPage(props: {
               </tr>
             </thead>
             <tbody>
-              {filtered.slice(0, TABLE_LIMIT).map((inv: MismatchedInvoice) => (
+              {pageItems.map((inv: MismatchedInvoice) => (
                 <tr key={inv.id} className="border-b hover:bg-gray-50">
                   <td className="py-2 pr-4">
                     <Link href={`/review/${inv.id}`} className="text-blue-600 underline">
@@ -190,6 +198,37 @@ export default async function ReconciliationPage(props: {
               ))}
             </tbody>
           </table>
+        )}
+        {filtered.length > 0 && (
+          <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+            <span>
+              Page {page} of {totalPages} ({filtered.length} invoice{filtered.length === 1 ? "" : "s"})
+            </span>
+            <div className="flex gap-2">
+              <Link
+                href={buildQuery({ page: String(page - 1) })}
+                aria-disabled={page <= 1}
+                className={`rounded px-3 py-1 ${
+                  page <= 1
+                    ? "pointer-events-none bg-gray-100 text-gray-300"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Previous
+              </Link>
+              <Link
+                href={buildQuery({ page: String(page + 1) })}
+                aria-disabled={page >= totalPages}
+                className={`rounded px-3 py-1 ${
+                  page >= totalPages
+                    ? "pointer-events-none bg-gray-100 text-gray-300"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Next
+              </Link>
+            </div>
+          </div>
         )}
       </div>
 
