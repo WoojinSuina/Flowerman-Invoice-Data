@@ -19,9 +19,12 @@
         <string>/Users/YOUR_USERNAME/Scans</string>
     </array>
 
-    <!-- ...and also on a timer, in case a filesystem event is ever missed -->
+    <!-- ...and also on a timer, in case a filesystem event is ever missed
+         (e.g. WatchPaths fires while a multi-page scan is still being
+         written, the freshness check correctly skips it, and there's no
+         second WatchPaths event once writing finishes) -->
     <key>StartInterval</key>
-    <integer>300</integer>
+    <integer>60</integer>
 
     <key>RunAtLoad</key>
     <true/>
