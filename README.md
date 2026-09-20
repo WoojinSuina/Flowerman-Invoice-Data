@@ -385,6 +385,21 @@ security patches. Notable side effects:
     (useful for spotting one location's employee making the same mistake
     repeatedly).
 
+- **Blank credit/total section means "everything sold."** If a scanned
+  invoice's bottom summary has nothing written for total credit and no
+  total-due either, that's not missing data — it means nothing was
+  returned, so the (unwritten) total due is just the total charges.
+  `lib/validation/fromExtraction.ts`'s `inferBlankTotalAmountDue()` applies
+  this right after extraction, before validation and persistence: without
+  it, a blank bottom section reads as `totalAmountDue = $0.00`, which then
+  compares against the calculated line-item total and gets wrongly flagged
+  as a massive discrepancy. Only ever raises `totalAmountDue` up to match
+  `totalCharges` — if it turns out there really were per-item returns
+  despite the blank summary, the math still won't reconcile and the
+  invoice still correctly falls through to REVIEW. `Invoice.rawExtraction`
+  and `ExtractionAttempt.rawResponse` still capture exactly what the AI
+  said before this correction, never the corrected value.
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Adding/removing line items during review (corrections only edit existing

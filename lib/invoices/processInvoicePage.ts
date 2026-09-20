@@ -1,7 +1,7 @@
 import { Prisma, type Store } from "@prisma/client";
 import { ClaudeInvoiceExtractor } from "@/lib/extraction/providers/claude";
 import { validateInvoice, type InvoiceValidationResult } from "@/lib/validation/engine";
-import { toValidationInput } from "@/lib/validation/fromExtraction";
+import { inferBlankTotalAmountDue, toValidationInput } from "@/lib/validation/fromExtraction";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
@@ -120,6 +120,12 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     return { ok: false, sourcePage, error: `Extraction failed: ${message}` };
   }
 
+  // Preserve exactly what the AI read, forever, before applying the
+  // business-rule correction below — rawExtraction/rawResponse elsewhere
+  // in this function always refer back to this, never the corrected value.
+  const rawExtraction = extracted;
+  extracted = inferBlankTotalAmountDue(extracted);
+
   let store: Store | undefined;
 
   try {
@@ -210,7 +216,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         approvedAt: autoApproved ? new Date() : null,
         possibleDuplicateOfId: possibleDuplicate?.id ?? null,
         validationSuggestions: result.suggestions as unknown as Prisma.InputJsonValue,
-        rawExtraction: extracted,
+        rawExtraction,
         sourceFile: sourceFileName,
         sourcePage,
         sourceImageUrl,
@@ -240,7 +246,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
             provider: extractor.providerName,
             processingJobId,
             sourcePage,
-            rawResponse: extracted,
+            rawResponse: rawExtraction,
             succeeded: true,
           },
         },
@@ -281,7 +287,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         provider: extractor.providerName,
         processingJobId,
         sourcePage,
-        rawResponse: extracted as unknown as Prisma.InputJsonValue,
+        rawResponse: rawExtraction as unknown as Prisma.InputJsonValue,
         succeeded: false,
         errorMessage: message,
         // Always uploaded already at this point (the caller uploads before
