@@ -51,23 +51,19 @@ function lineItemKey(item: DuplicateCandidateItem): string {
 
 /**
  * Same store + same date isn't enough on its own to call two invoices a
- * duplicate (a store can get two real deliveries on the same day) — the
- * exact same set of line items (product, delivered, returned, unit cost)
- * is the signal, since a duplicate SCAN of the same physical invoice has
- * the same products both times even if OCR misread the printed total
- * differently between the two reads.
- *
- * A total-amount match alone, with different products, is NOT treated as
- * a duplicate signal: two genuinely different real deliveries landing on
- * the same dollar total is far more plausible than the same invoice being
- * scanned twice with a completely different set of products both times.
- * An invoice that reconciles on its own math should be free to PASS in
- * that case, not get stuck in REVIEW over a coincidental total match.
+ * duplicate (a store can get two real deliveries on the same day) — but
+ * matching on the total OR on the exact same set of line items (product,
+ * delivered, returned, unit cost) is a strong enough signal either way.
+ * Checking items too (not just the dollar total) catches a re-scan where
+ * OCR misread the total differently between the two reads but got the same
+ * products/quantities both times.
  */
 function isLikelyDuplicate(
-  candidate: { items: DuplicateCandidateItem[] },
+  candidate: { totalAmountDueCents: number; items: DuplicateCandidateItem[] },
+  extractedTotalAmountDueCents: number,
   extractedItems: DuplicateCandidateItem[]
 ): boolean {
+  if (candidate.totalAmountDueCents === extractedTotalAmountDueCents) return true;
   if (candidate.items.length !== extractedItems.length) return false;
   const candidateKeys = new Set(candidate.items.map(lineItemKey));
   return extractedItems.every((item) => candidateKeys.has(lineItemKey(item)));
@@ -140,8 +136,8 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
 
     // Catches a re-scan that OCR reads slightly differently (so the exact
     // invoiceNumber+storeId unique constraint below wouldn't catch it): same
-    // store, same date, and the same set of line items, but a different
-    // invoice number.
+    // store, same date, and either the same total or the same set of line
+    // items, but a different invoice number.
     const sameStoreDateCandidates = await prisma.invoice.findMany({
       where: {
         storeId: store.id,
@@ -151,6 +147,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       select: {
         id: true,
         invoiceNumber: true,
+        totalAmountDueCents: true,
         items: {
           select: {
             productName: true,
@@ -162,7 +159,11 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       },
     });
     const possibleDuplicate = sameStoreDateCandidates.find((candidate) =>
-      isLikelyDuplicate(candidate, result.items)
+      isLikelyDuplicate(
+        candidate,
+        dollarsToCents(extracted.totalAmountDue),
+        result.items
+      )
     );
 
     // Sequential, not Promise.all — an invoice with many distinct products
