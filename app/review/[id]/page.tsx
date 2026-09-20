@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { InvoiceReviewForm } from "@/components/review/InvoiceReviewForm";
+import { isConsignmentStore } from "@/lib/stores";
 
 export default async function ReviewDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -34,6 +35,7 @@ export default async function ReviewDetailPage(props: { params: Promise<{ id: st
           invoiceDate: invoice.invoiceDate.toISOString().slice(0, 10),
           validationStatus: invoice.validationStatus,
           autoApprovedReason: invoice.autoApprovedReason,
+          isConsignment: isConsignmentStore(invoice.store),
           duplicateOf,
           totalChargesCents: invoice.totalChargesCents,
           totalCreditCents: invoice.totalCreditCents,

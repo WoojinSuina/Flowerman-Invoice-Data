@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { validateInvoice, type LineItemInput } from "@/lib/validation/engine";
+import {
+  validateInvoice,
+  effectiveStatusForConsignment,
+  type LineItemInput,
+} from "@/lib/validation/engine";
 import { centsToDollars, dollarsToCents, formatCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
 import { StatusBadge } from "@/components/review/StatusBadge";
@@ -31,6 +35,7 @@ interface ReviewInvoice {
   items: ReviewItem[];
   duplicateOf?: { id: string; invoiceNumber: string; sourceImageUrl: string | null } | null;
   autoApprovedReason?: string | null;
+  isConsignment: boolean;
 }
 
 function ScannedImage({ url, alt }: { url: string; alt: string }) {
@@ -137,6 +142,12 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
       items: engineItems,
     });
   }, [totals, items]);
+
+  // Mirrors the server-side override in processInvoicePage.ts /
+  // corrections/route.ts — a consignment invoice's written total isn't
+  // derived from this page's math, so the live preview shouldn't show
+  // REVIEW over a gap that's expected by design.
+  const liveStatus = effectiveStatusForConsignment(liveValidation, invoice.isConsignment);
 
   const changedFields = useMemo(() => {
     const changes: string[] = [];
@@ -297,7 +308,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             </h1>
             <p className="text-sm text-gray-500">
               Saved status: <StatusBadge status={status} /> · Live:{" "}
-              <StatusBadge status={liveValidation.status} />
+              <StatusBadge status={liveStatus} />
             </p>
           </div>
         </div>
@@ -311,6 +322,15 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             at this store has the same date and matches on total amount due or
             line items — check whether this is a separate delivery or an
             accidental re-scan before approving.
+          </div>
+        )}
+
+        {invoice.isConsignment && liveValidation.differenceCents !== 0 && (
+          <div className="mb-4 rounded border border-purple-300 bg-purple-50 px-3 py-2 text-sm text-purple-900">
+            Consignment store — the written total reflects a running balance
+            from the prior delivery cycle, not this page&apos;s own math, so a
+            difference here ({formatCents(liveValidation.differenceCents)}) is
+            expected and doesn&apos;t need to be corrected.
           </div>
         )}
 
@@ -429,7 +449,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
           </tfoot>
         </table>
 
-        {liveValidation.suggestions.length > 0 && (
+        {!invoice.isConsignment && liveValidation.suggestions.length > 0 && (
           <ul className="mb-4 list-disc rounded border border-amber-300 bg-amber-50 p-3 pl-6 text-sm text-amber-900">
             {liveValidation.suggestions.map((s, i) => (
               <li key={i}>{s.message}</li>

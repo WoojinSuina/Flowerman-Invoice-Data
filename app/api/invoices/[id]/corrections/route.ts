@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
-import { validateInvoice } from "@/lib/validation/engine";
+import { validateInvoice, effectiveStatusForConsignment } from "@/lib/validation/engine";
+import { isConsignmentStore } from "@/lib/stores";
 import {
   diffInvoiceTotals,
   diffInvoiceDate,
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const existing = await prisma.invoice.findUnique({
     where: { id: params.id },
-    include: { items: { orderBy: { lineNumber: "asc" } } },
+    include: { items: { orderBy: { lineNumber: "asc" } }, store: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -97,6 +98,15 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     })),
   });
 
+  // Same consignment override as at ingestion time (see
+  // effectiveStatusForConsignment) — a consignment invoice's written
+  // total isn't derived from this page's math, so a correction to
+  // totals/line items shouldn't re-impose that comparison.
+  const effectiveStatus = effectiveStatusForConsignment(
+    validation,
+    isConsignmentStore(existing.store)
+  );
+
   // A possible-duplicate flag or an impossible (future) date both force
   // REVIEW regardless of what the recalculated math says — same rule as at
   // ingestion time, and neither is something a total/line-item correction
@@ -104,7 +114,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const finalStatus =
     existing.possibleDuplicateOfId || isFutureDate(correctedInvoiceDate)
       ? "REVIEW"
-      : validation.status;
+      : effectiveStatus;
 
   if (diffs.length > 0) {
     const actor = body.correctedBy?.trim() || DEFAULT_ACTOR;

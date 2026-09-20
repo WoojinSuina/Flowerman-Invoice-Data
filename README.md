@@ -411,9 +411,26 @@ security patches. Notable side effects:
   half of the printed line, never the chain-name half, purely because of
   where that half happens to end). Surfaced as a "Consignment"/"Regular"
   badge (`components/stores/StoreTypeBadge.tsx`) on the Stores list and
-  detail pages — 60 of 308 current stores are consignment. Informational
-  only for now; nothing downstream (Dashboard/Reconciliation revenue
-  timing) accounts for the payment lag yet.
+  detail pages — 60 of 308 current stores are consignment. Dashboard/
+  Reconciliation revenue timing don't account for the payment lag yet.
+- **Consignment invoices don't need their own math to reconcile.**
+  Confirmed against a real scan: a consignment invoice's written "total
+  amount due" is a running balance carried from the prior delivery cycle
+  (see above), not derived from this page's charges/credit/line items at
+  all — comparing them was guaranteed to misfire. `lib/validation/engine.ts`'s
+  `effectiveStatusForConsignment()` skips that comparison for a
+  consignment store's invoice and PASSes it as long as there's no
+  impossible quantity (returned > delivered), which is still a real
+  problem regardless of consignment. Applied consistently at ingestion
+  (`processInvoicePage.ts`), on manual corrections (`corrections/route.ts`),
+  and in the review page's live preview (`InvoiceReviewForm.tsx`), so the
+  same invoice never shows conflicting statuses depending on where you
+  look. The quantity-error suggestion is also suppressed for these — it
+  assumes the gap is an arithmetic typo, which would be misleading here.
+  A one-time backfill re-evaluated every consignment-store invoice already
+  in REVIEW: 30 of 57 moved to PASS (their only issue was this now-expected
+  mismatch); the other 27 correctly stayed in REVIEW for a real impossible-
+  quantity problem, unrelated to consignment.
 
 ## What's NOT built yet (by design — see Phases below)
 

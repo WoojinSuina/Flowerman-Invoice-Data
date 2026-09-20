@@ -156,3 +156,26 @@ export function validateInvoice(input: InvoiceValidationInput): InvoiceValidatio
     suggestions,
   };
 }
+
+/**
+ * A consignment invoice's written "total amount due" reflects a running
+ * balance carried over from a prior delivery cycle (this page's products
+ * are what's being delivered now; the money being collected now is for
+ * what was delivered last cycle) — it is NOT derived from this page's own
+ * charges/credit, by design. Comparing it against this page's calculated
+ * total, or checking that this page's own charges - credit = amount due,
+ * is therefore meaningless and will misfire on every consignment invoice.
+ * Only the per-line-item math (no impossible quantities — returned >
+ * delivered is nonsensical regardless of consignment) is still a real
+ * signal. Confirmed against a real scanned example: a $57.99 written-vs-
+ * calculated gap driven entirely by this structural mismatch, not an
+ * arithmetic error.
+ */
+export function effectiveStatusForConsignment(
+  result: Pick<InvoiceValidationResult, "status" | "items">,
+  isConsignment: boolean
+): ValidationStatus {
+  if (!isConsignment) return result.status;
+  const anyImpossibleQuantity = result.items.some((item) => item.hasImpossibleQuantity);
+  return anyImpossibleQuantity ? "REVIEW" : "PASS";
+}
