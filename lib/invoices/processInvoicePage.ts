@@ -2,6 +2,7 @@ import { Prisma, type Store } from "@prisma/client";
 import { ClaudeInvoiceExtractor } from "@/lib/extraction/providers/claude";
 import { validateInvoice, type InvoiceValidationResult } from "@/lib/validation/engine";
 import { inferBlankTotalAmountDue, toValidationInput } from "@/lib/validation/fromExtraction";
+import { isLikelyDuplicate } from "@/lib/invoices/duplicateDetection";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
@@ -37,37 +38,6 @@ async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   return prisma.store.create({
     data: { storeNumber: extracted.storeNumber, name, address },
   });
-}
-
-interface DuplicateCandidateItem {
-  productName: string;
-  deliveredQuantity: number;
-  returnedQuantity: number;
-  unitCostCents: number;
-}
-
-function lineItemKey(item: DuplicateCandidateItem): string {
-  return `${item.productName}|${item.deliveredQuantity}|${item.returnedQuantity}|${item.unitCostCents}`;
-}
-
-/**
- * Same store + same date isn't enough on its own to call two invoices a
- * duplicate (a store can get two real deliveries on the same day) — but
- * matching on the total OR on the exact same set of line items (product,
- * delivered, returned, unit cost) is a strong enough signal either way.
- * Checking items too (not just the dollar total) catches a re-scan where
- * OCR misread the total differently between the two reads but got the same
- * products/quantities both times.
- */
-function isLikelyDuplicate(
-  candidate: { totalAmountDueCents: number; items: DuplicateCandidateItem[] },
-  extractedTotalAmountDueCents: number,
-  extractedItems: DuplicateCandidateItem[]
-): boolean {
-  if (candidate.totalAmountDueCents === extractedTotalAmountDueCents) return true;
-  if (candidate.items.length !== extractedItems.length) return false;
-  const candidateKeys = new Set(candidate.items.map(lineItemKey));
-  return extractedItems.every((item) => candidateKeys.has(lineItemKey(item)));
 }
 
 export interface ProcessPageInput {
@@ -157,6 +127,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         id: true,
         invoiceNumber: true,
         totalAmountDueCents: true,
+        rawExtraction: true,
         items: {
           select: {
             productName: true,
@@ -171,7 +142,8 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       isLikelyDuplicate(
         candidate,
         dollarsToCents(extracted.totalAmountDue),
-        result.items
+        result.items,
+        extracted.invoiceNumber
       )
     );
 
