@@ -1,13 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  experimental: {
-    // proxy.ts buffers every request body (to check the auth cookie) up to
-    // this limit before truncating it — default is 10MB, too small for
-    // multi-page invoice PDFs. Keep this above MAX_FILE_BYTES in
-    // app/api/invoices/upload/route.ts.
-    proxyClientMaxBodySize: "25mb",
-  },
-};
+// No experimental.proxyClientMaxBodySize override needed: since Phase 7,
+// no route receives a raw file body directly — uploads go straight from
+// the client to Supabase Storage via a signed URL (see "What's built
+// (Phase 7)" in the README), so every request body proxy.ts buffers is
+// small JSON, well under Next's default limit.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

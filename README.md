@@ -436,6 +436,46 @@ security patches. Notable side effects:
     one-time backfill from the incorrect version was undone and redone
     under the corrected rule.
 
+## What's built (Phase 7)
+
+- **Uploads no longer pass file bytes through this Next.js server.**
+  Vercel caps a serverless function's request body around 4.5MB — well
+  under a real multi-page scanned invoice PDF — so `POST
+  /api/invoices/upload` (a single request carrying the whole file) would
+  have silently broken in production. Replaced with a two-step flow:
+  - `POST /api/invoices/upload/init` (tiny JSON: filename/mimeType/size)
+    mints a Supabase Storage signed upload URL (`lib/storage/supabase.ts`'s
+    `createSignedUpload`) and returns it.
+  - The caller PUTs the raw file directly to that URL — confirmed against
+    the live project that this needs no SDK or API key at all, just a
+    plain `PUT` with a `Content-Type` header; the token is embedded in the
+    URL itself.
+  - `POST /api/invoices/upload/complete` (tiny JSON: the resulting path)
+    downloads those bytes back from Storage — an outbound fetch from
+    inside the function, not an inbound request body, so it isn't subject
+    to the same limit — then runs the existing split/queue pipeline
+    (`lib/invoices/ingestRawFile.ts`, extracted from the old route
+    unchanged) exactly as before. The raw whole-file object is deleted
+    from Storage afterward; only the split per-page copies persist.
+  - The browser (`UploadQueueProvider.tsx`) now does all three steps per
+    file instead of one `FormData` POST. Nothing about the background
+    processing pipeline downstream of "raw bytes acquired" changed.
+- **Unattended external uploads.** A new `UPLOAD_API_TOKEN` env var
+  (separate from `AUTH_SECRET`, so it can be rotated independently)
+  authenticates non-browser clients — no login session to carry a cookie
+  — via an `x-upload-token` header, checked in `proxy.ts` alongside the
+  existing cookie and internal-secret paths, scoped to just the two
+  upload routes above. Built for `scripts/scan-uploader/` (see below) but
+  usable by any future unattended client.
+- **`scripts/scan-uploader/`** — a dependency-free (bash + curl only, no
+  Node/Python required) watcher for a computer that isn't running this
+  app: point it at the folder your scanner saves finished scans to, and
+  it uploads each new file automatically via the flow above, using
+  `UPLOAD_API_TOKEN`. Installs as a macOS LaunchAgent (`launchd`) so it
+  starts automatically and reacts to new files via `WatchPaths`, with a
+  periodic fallback poll in case a filesystem event is missed. See that
+  directory's own README for setup.
+
 ## What's NOT built yet (by design — see Phases below)
 
 - Adding/removing line items during review (corrections only edit existing
@@ -470,6 +510,7 @@ npm run db:generate
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (Phase 2) | Supabase → Project Settings → API → `service_role` secret |
 | `SUPABASE_BUCKET` | Yes (Phase 2) | Name of a **public** Storage bucket you create, e.g. `invoice-scans` |
 | `AUTH_SECRET` | Yes | The shared family login password (also used as the session cookie value). Any string, e.g. `openssl rand -hex 32`. |
+| `UPLOAD_API_TOKEN` | No | Lets an unattended external client (e.g. `scripts/scan-uploader/`) upload without a browser login session. Any string, e.g. `openssl rand -hex 32`. Leave unset to disable unattended uploads. |
 
 ## Local development
 
@@ -479,16 +520,23 @@ npm run dev
 
 Open `/upload` in the browser to upload invoices through the UI (a single
 image, or a multi-page PDF — split and queued one page per invoice
-automatically). Or hit the endpoint directly:
+automatically). Or hit the endpoints directly (see "What's built (Phase 7)"
+for why this is two requests, not one):
 
 ```bash
-curl -X POST http://localhost:3000/api/invoices/upload \
-  -F "file=@/path/to/invoices.pdf"
+SIGNED=$(curl -s -X POST http://localhost:3000/api/invoices/upload/init \
+  -H "Content-Type: application/json" -H "x-upload-token: $UPLOAD_API_TOKEN" \
+  -d '{"filename":"invoices.pdf","mimeType":"application/pdf","size":12345}')
+# parse `signedUrl` and `path` out of $SIGNED, then:
+curl -s -X PUT "<signedUrl>" -H "Content-Type: application/pdf" --data-binary @/path/to/invoices.pdf
+curl -s -X POST http://localhost:3000/api/invoices/upload/complete \
+  -H "Content-Type: application/json" -H "x-upload-token: $UPLOAD_API_TOKEN" \
+  -d '{"path":"<path>","filename":"invoices.pdf","mimeType":"application/pdf"}'
 ```
 
-Response is `{ job }` — the `ProcessingJob` row, returned as soon as every
-page is uploaded and queued (see "What's built (Phase 6)" above).
-Extraction hasn't happened yet at this point, so there are no per-page
+Response from `/complete` is `{ job }` — the `ProcessingJob` row, returned
+as soon as every page is uploaded and queued (see "What's built (Phase 6)"
+above). Extraction hasn't happened yet at this point, so there are no per-page
 results in the response; track progress on `/jobs/[id]`, which updates as
 the background worker processes each page.
 
@@ -519,15 +567,20 @@ against production `DATABASE_URL` as part of your deploy step.
 5. **Phase 5** — Delivery recommendations (transparent stats, not ML).
 6. **Phase 6** — Async upload/extraction: fast upload + queue, self-chaining
    background worker, safe for serverless deployment.
+7. **Phase 7** — Direct-to-Storage uploads (no more request-body size
+   limit), unattended external uploads via API token, and a scanner
+   watcher script for automatic ingestion from another computer.
 
 ## Architectural notes
 
-- **`next.config.ts`**: sets `experimental.proxyClientMaxBodySize: "25mb"`.
-  Next.js buffers every request body passing through `proxy.ts` (needed
-  there to check the auth cookie) up to a default of 10MB, silently
-  truncating anything larger — which corrupts a multipart upload and
-  crashes `request.formData()` with an opaque error. Keep this above
-  `MAX_FILE_BYTES` in `app/api/invoices/upload/route.ts` (currently 20MB).
+- **`next.config.ts`**: no body-size override needed. Before Phase 7, a
+  multi-page PDF's raw bytes passed through `POST /api/invoices/upload` as
+  a single request, which required raising `experimental.proxyClientMaxBodySize`
+  above Next's small default (`proxy.ts` buffers every request body to
+  check the auth cookie, silently truncating anything over the limit).
+  Since Phase 7, uploads go straight from the client to Supabase Storage
+  via a signed URL — every request body this server actually receives is
+  now small JSON, so the override was removed.
 - **Currency**: everything is integer cents (`lib/money.ts`). Never compare
   floats for money.
 - **Extraction prompt fixes are cumulative, not automatically applied to

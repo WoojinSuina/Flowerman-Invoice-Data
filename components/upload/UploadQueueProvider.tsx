@@ -89,12 +89,42 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
     for (const item of toProcess) {
       setQueue((q) => q.map((i) => (i.id === item.id ? { ...i, status: "uploading" } : i)));
       try {
-        const formData = new FormData();
-        formData.append("file", item.file);
-        const res = await fetch("/api/invoices/upload", { method: "POST", body: formData });
-        const body = (await res.json()) as UploadResponse;
-        if (!res.ok) {
-          throw new Error(body.detail ?? body.error ?? `Upload failed (${res.status})`);
+        // Two steps so the file's bytes go straight from the browser to
+        // Storage, never through this Next.js server as a request body —
+        // required once deployed (Vercel caps a function's request body
+        // around 4.5MB, well under a real multi-page scanned PDF).
+        const initRes = await fetch("/api/invoices/upload/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: item.file.name,
+            mimeType: item.file.type,
+            size: item.file.size,
+          }),
+        });
+        const initBody = await initRes.json();
+        if (!initRes.ok) {
+          throw new Error(initBody.detail ?? initBody.error ?? `Upload failed (${initRes.status})`);
+        }
+        const { signedUrl, path } = initBody as { signedUrl: string; path: string };
+
+        const putRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": item.file.type },
+          body: item.file,
+        });
+        if (!putRes.ok) {
+          throw new Error(`Could not upload to storage (${putRes.status})`);
+        }
+
+        const completeRes = await fetch("/api/invoices/upload/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path, filename: item.file.name, mimeType: item.file.type }),
+        });
+        const body = (await completeRes.json()) as UploadResponse;
+        if (!completeRes.ok) {
+          throw new Error(body.detail ?? body.error ?? `Upload failed (${completeRes.status})`);
         }
         setQueue((q) =>
           q.map((i) => (i.id === item.id ? { ...i, status: "done", response: body } : i))
