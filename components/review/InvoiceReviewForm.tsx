@@ -3,11 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  validateInvoice,
-  effectiveStatusForConsignment,
-  type LineItemInput,
-} from "@/lib/validation/engine";
+import { validateInvoice, type LineItemInput } from "@/lib/validation/engine";
 import { centsToDollars, dollarsToCents, formatCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
 import { StatusBadge } from "@/components/review/StatusBadge";
@@ -135,19 +131,21 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
       deliveredQuantity: item.deliveredQuantity,
       returnedQuantity: item.returnedQuantity,
     }));
-    return validateInvoice({
-      invoiceTotalChargesCents: totals.totalChargesCents,
-      invoiceTotalCreditCents: totals.totalCreditCents,
-      invoiceTotalAmountDueCents: totals.totalAmountDueCents,
-      items: engineItems,
-    });
-  }, [totals, items]);
-
-  // Mirrors the server-side override in processInvoicePage.ts /
-  // corrections/route.ts — a consignment invoice's written total isn't
-  // derived from this page's math, so the live preview shouldn't show
-  // REVIEW over a gap that's expected by design.
-  const liveStatus = effectiveStatusForConsignment(liveValidation, invoice.isConsignment);
+    return validateInvoice(
+      {
+        invoiceTotalChargesCents: totals.totalChargesCents,
+        invoiceTotalCreditCents: totals.totalCreditCents,
+        invoiceTotalAmountDueCents: totals.totalAmountDueCents,
+        items: engineItems,
+      },
+      // Same consignment allowance as at ingestion time — a return can
+      // credit stock delivered in a prior cycle, so a product showing 0
+      // delivered this cycle but a nonzero return isn't impossible here.
+      // The written total still has to reconcile with the calculated
+      // total like any other invoice.
+      { allowReturnsExceedingDelivered: invoice.isConsignment }
+    );
+  }, [totals, items, invoice.isConsignment]);
 
   const changedFields = useMemo(() => {
     const changes: string[] = [];
@@ -308,7 +306,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             </h1>
             <p className="text-sm text-gray-500">
               Saved status: <StatusBadge status={status} /> · Live:{" "}
-              <StatusBadge status={liveStatus} />
+              <StatusBadge status={liveValidation.status} />
             </p>
           </div>
         </div>
@@ -325,14 +323,15 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
           </div>
         )}
 
-        {invoice.isConsignment && liveValidation.differenceCents !== 0 && (
-          <div className="mb-4 rounded border border-purple-300 bg-purple-50 px-3 py-2 text-sm text-purple-900">
-            Consignment store — the written total reflects a running balance
-            from the prior delivery cycle, not this page&apos;s own math, so a
-            difference here ({formatCents(liveValidation.differenceCents)}) is
-            expected and doesn&apos;t need to be corrected.
-          </div>
-        )}
+        {invoice.isConsignment &&
+          liveValidation.items.some((i) => i.returnedQuantity > i.deliveredQuantity) && (
+            <div className="mb-4 rounded border border-purple-300 bg-purple-50 px-3 py-2 text-sm text-purple-900">
+              Consignment store — a return quantity exceeding this cycle&apos;s
+              delivered quantity is expected (crediting stock from the prior
+              cycle) and isn&apos;t flagged as an error. The total amount due
+              still has to match the calculated amount below.
+            </div>
+          )}
 
         {invoice.autoApprovedReason && (
           <div className="mb-4 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
@@ -449,7 +448,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
           </tfoot>
         </table>
 
-        {!invoice.isConsignment && liveValidation.suggestions.length > 0 && (
+        {liveValidation.suggestions.length > 0 && (
           <ul className="mb-4 list-disc rounded border border-amber-300 bg-amber-50 p-3 pl-6 text-sm text-amber-900">
             {liveValidation.suggestions.map((s, i) => (
               <li key={i}>{s.message}</li>

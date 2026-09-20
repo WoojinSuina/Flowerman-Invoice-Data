@@ -1,11 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  validateInvoice,
-  validateLineItem,
-  suggestQuantityErrors,
-  effectiveStatusForConsignment,
-} from "./engine.ts";
+import { validateInvoice, validateLineItem, suggestQuantityErrors } from "./engine.ts";
 
 test("trivial empty invoice (0/0/0) -> PASS", () => {
   const result = validateInvoice({
@@ -163,34 +158,61 @@ test("duplicate-invoice-number handling is a DB-layer concern, not validation en
   assert.ok(true);
 });
 
-test("effectiveStatusForConsignment: non-consignment invoice is untouched", () => {
-  const result = validateInvoice({
-    invoiceTotalChargesCents: 10000,
-    invoiceTotalCreditCents: 0,
-    invoiceTotalAmountDueCents: 19000, // huge mismatch -> REVIEW
-    items: [{ productName: "Rose", unitCostCents: 100, deliveredQuantity: 100, returnedQuantity: 0 }],
+test("validateLineItem: returned > delivered is impossible for a regular store", () => {
+  const item = validateLineItem({
+    productName: "Rose",
+    unitCostCents: 100,
+    deliveredQuantity: 0,
+    returnedQuantity: 1,
   });
-  assert.equal(result.status, "REVIEW");
-  assert.equal(effectiveStatusForConsignment(result, false), "REVIEW");
+  assert.equal(item.hasImpossibleQuantity, true);
+  assert.equal(item.soldQuantity, -1);
 });
 
-test("effectiveStatusForConsignment: consignment invoice with a real gap still PASSes", () => {
-  const result = validateInvoice({
-    invoiceTotalChargesCents: 24330,
-    invoiceTotalCreditCents: 8117,
-    invoiceTotalAmountDueCents: 19012, // real example: doesn't reconcile with this page's math
-    items: [{ productName: "Rose", unitCostCents: 279, deliveredQuantity: 8, returnedQuantity: 4 }],
-  });
-  assert.equal(result.status, "REVIEW");
-  assert.equal(effectiveStatusForConsignment(result, true), "PASS");
+test("validateLineItem: returned > delivered is allowed when allowReturnsExceedingDelivered is set (consignment)", () => {
+  const item = validateLineItem(
+    { productName: "Rose", unitCostCents: 100, deliveredQuantity: 0, returnedQuantity: 1 },
+    { allowReturnsExceedingDelivered: true }
+  );
+  assert.equal(item.hasImpossibleQuantity, false);
+  assert.equal(item.soldQuantity, -1);
+  assert.equal(item.netSoldAmountCents, -100);
 });
 
-test("effectiveStatusForConsignment: an impossible quantity still forces REVIEW even for consignment", () => {
-  const result = validateInvoice({
-    invoiceTotalChargesCents: 1000,
-    invoiceTotalCreditCents: 0,
-    invoiceTotalAmountDueCents: 500,
-    items: [{ productName: "Rose", unitCostCents: 100, deliveredQuantity: 2, returnedQuantity: 5 }],
-  });
-  assert.equal(effectiveStatusForConsignment(result, true), "REVIEW");
+test("validateLineItem: negative quantities are still impossible even when returns may exceed delivered", () => {
+  const item = validateLineItem(
+    { productName: "Rose", unitCostCents: 100, deliveredQuantity: -1, returnedQuantity: 0 },
+    { allowReturnsExceedingDelivered: true }
+  );
+  assert.equal(item.hasImpossibleQuantity, true);
+});
+
+test("validateInvoice: consignment invoice with a real total mismatch still needs REVIEW", () => {
+  // Real example: a written total that's a prior-cycle running balance,
+  // not derived from this page's math. Allowing returns to exceed
+  // delivered doesn't excuse a genuine reconciliation failure — the total
+  // still has to match the calculated amount.
+  const result = validateInvoice(
+    {
+      invoiceTotalChargesCents: 24330,
+      invoiceTotalCreditCents: 8117,
+      invoiceTotalAmountDueCents: 19012,
+      items: [{ productName: "Rose", unitCostCents: 279, deliveredQuantity: 8, returnedQuantity: 4 }],
+    },
+    { allowReturnsExceedingDelivered: true }
+  );
+  assert.equal(result.status, "REVIEW");
+});
+
+test("validateInvoice: consignment invoice PASSes when returns exceed delivered but the total still reconciles", () => {
+  const result = validateInvoice(
+    {
+      invoiceTotalChargesCents: 0,
+      invoiceTotalCreditCents: 279,
+      invoiceTotalAmountDueCents: -279,
+      items: [{ productName: "Rose", unitCostCents: 279, deliveredQuantity: 0, returnedQuantity: 1 }],
+    },
+    { allowReturnsExceedingDelivered: true }
+  );
+  assert.equal(result.status, "PASS");
 });

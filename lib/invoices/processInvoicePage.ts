@@ -1,10 +1,6 @@
 import { Prisma, type Store } from "@prisma/client";
 import { ClaudeInvoiceExtractor } from "@/lib/extraction/providers/claude";
-import {
-  validateInvoice,
-  effectiveStatusForConsignment,
-  type InvoiceValidationResult,
-} from "@/lib/validation/engine";
+import { validateInvoice, type InvoiceValidationResult } from "@/lib/validation/engine";
 import { inferBlankTotalAmountDue, toValidationInput } from "@/lib/validation/fromExtraction";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
@@ -134,10 +130,18 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
   let store: Store | undefined;
 
   try {
-    const validationInput = toValidationInput(extracted);
-    const result = validateInvoice(validationInput);
-
     store = await resolveStore(extracted);
+
+    // A return can credit stock delivered in a PRIOR cycle for a
+    // consignment store (see isConsignmentStore) — a product showing 0
+    // delivered this cycle but a nonzero return isn't impossible, just
+    // expected. The written total still has to reconcile with the
+    // calculated total either way; only this per-item check relaxes.
+    const consignment = isConsignmentStore(store);
+    const validationInput = toValidationInput(extracted);
+    const result = validateInvoice(validationInput, {
+      allowReturnsExceedingDelivered: consignment,
+    });
 
     // Catches a re-scan that OCR reads slightly differently (so the exact
     // invoiceNumber+storeId unique constraint below wouldn't catch it): same
@@ -191,29 +195,19 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     // the math otherwise reconciled, same as a possible duplicate.
     const invoiceDateIsFuture = isFutureDate(new Date(extracted.invoiceDate));
 
-    // A consignment store's written total reflects a running balance from
-    // the prior delivery cycle, not this page's own math — see
-    // effectiveStatusForConsignment for why comparing it against this
-    // page's totals is meaningless and would misfire on every consignment
-    // invoice. Everywhere below, this replaces the engine's own status.
-    const consignment = isConsignmentStore(store);
-    const effectiveStatus = effectiveStatusForConsignment(result, consignment);
-
     // A PASS with an exact $0.00 difference reconciled perfectly — there's
     // no exception left for a human to resolve, so skip the manual Approve
     // click and go straight to APPROVED (still logged in the audit trail,
     // just with "system" as the actor instead of a person). A possible
     // duplicate or an impossible (future) date always forces REVIEW
     // regardless, since both are exactly the kind of exception a human
-    // needs to resolve. A consignment PASS never auto-approves this way —
-    // its difference is essentially never $0.00 by design — so it still
-    // gets a first human look before APPROVED.
+    // needs to resolve.
     const autoApproved =
       !possibleDuplicate &&
       !invoiceDateIsFuture &&
-      effectiveStatus === "PASS" &&
+      result.status === "PASS" &&
       result.differenceCents === 0;
-    const finalStatus = possibleDuplicate || invoiceDateIsFuture ? "REVIEW" : effectiveStatus;
+    const finalStatus = possibleDuplicate || invoiceDateIsFuture ? "REVIEW" : result.status;
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -230,10 +224,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         validationStatus: autoApproved ? "APPROVED" : finalStatus,
         approvedAt: autoApproved ? new Date() : null,
         possibleDuplicateOfId: possibleDuplicate?.id ?? null,
-        // A quantity-error suggestion assumes the gap is an arithmetic
-        // typo — misleading on a consignment PASS, where the gap is the
-        // expected prior-cycle carryover, not an error to explain.
-        validationSuggestions: (consignment ? [] : result.suggestions) as unknown as Prisma.InputJsonValue,
+        validationSuggestions: result.suggestions as unknown as Prisma.InputJsonValue,
         rawExtraction,
         sourceFile: sourceFileName,
         sourcePage,

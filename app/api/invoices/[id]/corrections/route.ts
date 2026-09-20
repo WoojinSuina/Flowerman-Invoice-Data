@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
-import { validateInvoice, effectiveStatusForConsignment } from "@/lib/validation/engine";
+import { validateInvoice } from "@/lib/validation/engine";
 import { isConsignmentStore } from "@/lib/stores";
 import {
   diffInvoiceTotals,
@@ -88,23 +88,20 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       : []),
   ];
 
-  const validation = validateInvoice({
-    ...correctedTotals,
-    items: correctedItemsByLine.map(({ productName, unitCostCents, deliveredQuantity, returnedQuantity }) => ({
-      productName,
-      unitCostCents,
-      deliveredQuantity,
-      returnedQuantity,
-    })),
-  });
-
-  // Same consignment override as at ingestion time (see
-  // effectiveStatusForConsignment) — a consignment invoice's written
-  // total isn't derived from this page's math, so a correction to
-  // totals/line items shouldn't re-impose that comparison.
-  const effectiveStatus = effectiveStatusForConsignment(
-    validation,
-    isConsignmentStore(existing.store)
+  const validation = validateInvoice(
+    {
+      ...correctedTotals,
+      items: correctedItemsByLine.map(({ productName, unitCostCents, deliveredQuantity, returnedQuantity }) => ({
+        productName,
+        unitCostCents,
+        deliveredQuantity,
+        returnedQuantity,
+      })),
+    },
+    // Same consignment allowance as at ingestion time — a return can
+    // credit stock delivered in a prior cycle, so a product showing 0
+    // delivered this cycle but a nonzero return isn't impossible here.
+    { allowReturnsExceedingDelivered: isConsignmentStore(existing.store) }
   );
 
   // A possible-duplicate flag or an impossible (future) date both force
@@ -114,7 +111,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const finalStatus =
     existing.possibleDuplicateOfId || isFutureDate(correctedInvoiceDate)
       ? "REVIEW"
-      : effectiveStatus;
+      : validation.status;
 
   if (diffs.length > 0) {
     const actor = body.correctedBy?.trim() || DEFAULT_ACTOR;
