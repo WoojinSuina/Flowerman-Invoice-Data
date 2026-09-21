@@ -240,18 +240,18 @@ export default async function DashboardPage(props: {
         />
       </div>
 
-      <div className="mt-8">
-        <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
+      <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Revenue by month ({year})</h2>
         <MonthlyBarChart
           data={monthlyRevenue}
           color="#2563eb"
           selectedMonthValue={monthParam(monthStart)}
           todayMonthValue={monthParam(new Date())}
         />
-      </div>
+      </section>
 
-      <div className="mt-8">
-        <h2 className="mb-2 font-medium">Revenue by week</h2>
+      <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Revenue by week</h2>
         {weeklyRevenue.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet.</p>
         ) : (
@@ -281,12 +281,12 @@ export default async function DashboardPage(props: {
             </tbody>
           </table>
         )}
-      </div>
+      </section>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-medium">Top stores</h2>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <section className="rounded-lg border bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Top stores</h2>
             {topStoresRaw.length > 0 && (
               <StoreListModal stores={allStoresEnriched} month={monthParam(monthStart)} />
             )}
@@ -332,10 +332,10 @@ export default async function DashboardPage(props: {
               </tbody>
             </table>
           )}
-        </div>
+        </section>
 
-        <div>
-          <h2 className="mb-2 font-medium">Top products</h2>
+        <section className="rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Top products</h2>
           {topProductsRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
@@ -369,7 +369,7 @@ export default async function DashboardPage(props: {
               </tbody>
             </table>
           )}
-        </div>
+        </section>
       </div>
     </main>
   );
