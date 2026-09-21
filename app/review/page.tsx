@@ -41,7 +41,7 @@ export default async function ReviewListPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
-  const status = searchParams.status ?? "REVIEW";
+  const status = searchParams.status ?? "ALL";
   const page = Math.max(1, Number(searchParams.page) || 1);
   const storeFilter = searchParams.store ?? "";
   const monthFilter = searchParams.month ?? "";
