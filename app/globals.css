@@ -2,10 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Elderly/large-text mode (components/ElderlyModeToggle.tsx). Tailwind's
-   spacing and font-size scales are rem-based, so bumping the root
-   font-size scales nearly everything in the app proportionally — text,
-   padding, gaps, icons — without needing to touch every component. */
+/* Elderly/large-text mode (lib/elderlyMode.ts) — always on, see there.
+   Tailwind's spacing and font-size scales are rem-based, so bumping the
+   root font-size scales nearly everything in the app proportionally —
+   text, padding, gaps, icons — without needing to touch every component. */
 html.elderly {
   font-size: 22px;
 }

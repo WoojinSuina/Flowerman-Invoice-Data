@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
-import { ElderlyModeToggle } from "@/components/ElderlyModeToggle";
 import { T } from "@/components/T";
 import { isElderlyMode } from "@/lib/elderlyMode";
 import type { TranslationKey } from "@/lib/i18n";
@@ -37,7 +36,6 @@ export async function NavBar() {
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <ElderlyModeToggle elderly={elderly} />
         <LogoutButton elderly={elderly} />
       </div>
     </nav>
