@@ -299,7 +299,39 @@ export default async function RecommendationsPage(props: {
                 </p>
               ) : (
                 <>
-                  <div className="mb-2 flex items-center gap-4 text-xs text-gray-500">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="py-2 pr-4">Product</th>
+                        <th className="py-2 pr-4">Suggested qty</th>
+                        <th className="py-2 pr-4">Avg delivered</th>
+                        <th className="py-2 pr-4">Avg returned</th>
+                        <th className="py-2 pr-4">Based on</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedStore.products.map((p) => (
+                        <tr key={p.productId} className="border-b">
+                          <td className="py-2 pr-4">{p.productName}</td>
+                          <td className="py-2 pr-4 tabular-nums font-semibold">
+                            {p.recommendedQty}
+                          </td>
+                          <td className="py-2 pr-4 tabular-nums text-gray-500">
+                            {p.avgDelivered.toFixed(1)}
+                          </td>
+                          <td className="py-2 pr-4 tabular-nums text-gray-500">
+                            {p.avgReturned.toFixed(1)}
+                          </td>
+                          <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <h2 className="mb-2 mt-8 font-medium">
+                    Recent invoices: delivered vs sold
+                  </h2>
+                  <div className="mb-4 flex items-center gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1">
                       <span
                         className="inline-block h-2.5 w-2.5 rounded-sm"
@@ -315,41 +347,13 @@ export default async function RecommendationsPage(props: {
                       Sold
                     </span>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-gray-500">
-                          <th className="py-2 pr-4">Product</th>
-                          <th className="py-2 pr-4">Suggested qty</th>
-                          <th className="py-2 pr-4">Avg delivered</th>
-                          <th className="py-2 pr-4">Avg returned</th>
-                          <th className="py-2 pr-4">Based on</th>
-                          <th className="py-2 pr-4">Recent invoices: delivered vs sold</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedStore.products.map((p) => (
-                          <tr key={p.productId} className="border-b">
-                            <td className="py-2 pr-4">{p.productName}</td>
-                            <td className="py-2 pr-4 tabular-nums font-semibold">
-                              {p.recommendedQty}
-                            </td>
-                            <td className="py-2 pr-4 tabular-nums text-gray-500">
-                              {p.avgDelivered.toFixed(1)}
-                            </td>
-                            <td className="py-2 pr-4 tabular-nums text-gray-500">
-                              {p.avgReturned.toFixed(1)}
-                            </td>
-                            <td className="py-2 pr-4 tabular-nums text-gray-500">
-                              {p.basisLabel}
-                            </td>
-                            <td className="py-2 pr-4">
-                              <ProductComparisonChart points={p.history} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-6">
+                    {selectedStore.products.map((p) => (
+                      <div key={p.productId} className="overflow-x-auto">
+                        <p className="mb-2 text-sm font-medium">{p.productName}</p>
+                        <ProductComparisonChart points={p.history} />
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
