@@ -15,12 +15,28 @@ export const maxDuration = 60;
  * nothing queued is a harmless no-op.
  */
 export async function POST(req: NextRequest) {
-  const claimed = await claimNextPendingPage();
+  const origin = req.nextUrl.origin;
+
+  let claimed: ClaimedPage | null;
+  try {
+    claimed = await claimNextPendingPage();
+  } catch (err) {
+    // Confirmed live: an unhandled throw here (e.g. a transient DB pool
+    // hiccup) crashes the whole handler before after() is ever registered,
+    // silently killing the chain with nothing left to restart it — the
+    // exact same failure mode as the very first version of this route, now
+    // reachable again because concurrent dispatch+processing doubled the
+    // DB load per hop. A failure claiming THIS page doesn't mean the next
+    // attempt will also fail, so retry via a fresh dispatch instead of
+    // just giving up.
+    console.error("process-next: failed to claim a page:", err);
+    after(() => dispatchNextHop(origin));
+    return NextResponse.json({ processed: false, error: (err as Error).message }, { status: 500 });
+  }
+
   if (!claimed) {
     return NextResponse.json({ processed: false, reason: "queue empty" });
   }
-
-  const origin = req.nextUrl.origin;
 
   // `after()` only runs once this response is fully sent, so the dispatch
   // and this page's own processing must be started CONCURRENTLY inside the
