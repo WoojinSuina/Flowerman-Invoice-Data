@@ -246,7 +246,8 @@ export default async function DashboardPage(props: {
         <MonthlyBarChart
           data={monthlyRevenue}
           color="#2563eb"
-          highlightMonthValue={monthParam(new Date())}
+          selectedMonthValue={monthParam(monthStart)}
+          todayMonthValue={monthParam(new Date())}
         />
       </div>
 
