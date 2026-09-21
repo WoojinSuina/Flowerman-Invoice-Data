@@ -47,6 +47,24 @@ function average(entries: HistoryEntry[], pick: (e: HistoryEntry) => number): nu
   return entries.reduce((sum, e) => sum + pick(e), 0) / entries.length;
 }
 
+// For a given invoice date, finds this store+product's entries from the
+// same calendar month exactly one year earlier, so the comparison chart
+// can show this year's delivery next to last year's for the same month —
+// no matches yet for most stores (not enough history), but the chart
+// picks this up automatically once a second year of data exists.
+function findPriorYearMatch(
+  entries: HistoryEntry[],
+  target: Date
+): { delivered: number; sold: number } | undefined {
+  const matches = entries.filter(
+    (e) =>
+      e.invoiceDate.getUTCMonth() === target.getUTCMonth() &&
+      e.invoiceDate.getUTCFullYear() === target.getUTCFullYear() - 1
+  );
+  if (matches.length === 0) return undefined;
+  return { delivered: average(matches, (e) => e.delivered), sold: average(matches, (e) => e.sold) };
+}
+
 export default async function RecommendationsPage(props: {
   searchParams: Promise<{ store?: string }>;
 }) {
@@ -145,6 +163,7 @@ export default async function RecommendationsPage(props: {
         dateLabel: formatInvoiceDate(e.invoiceDate),
         delivered: e.delivered,
         sold: e.sold,
+        priorYear: findPriorYearMatch(entries, e.invoiceDate),
       }));
     const recommendation: ProductRecommendation = {
       productId,
