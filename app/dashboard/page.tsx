@@ -110,8 +110,20 @@ export default async function DashboardPage(props: {
     const monthValue = monthParam(monthDate);
     const label = monthDate.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
     const row = monthlyByKey.get(monthValue);
-    monthlyRevenue.push({ label, monthValue, value: row?.revenue_cents ?? 0 });
-    monthlyVolume.push({ label, monthValue, value: row?.invoice_count ?? 0 });
+    const revenueCents = row?.revenue_cents ?? 0;
+    const invoiceCount = row?.invoice_count ?? 0;
+    monthlyRevenue.push({
+      label,
+      monthValue,
+      value: revenueCents,
+      displayValue: formatCents(revenueCents),
+    });
+    monthlyVolume.push({
+      label,
+      monthValue,
+      value: invoiceCount,
+      displayValue: invoiceCount.toLocaleString(),
+    });
   }
 
   const monthInvoicesForStores = await prisma.invoice.findMany({
@@ -331,15 +343,11 @@ export default async function DashboardPage(props: {
       <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
           <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
-          <MonthlyBarChart data={monthlyRevenue} formatValue={formatCents} color="#2563eb" />
+          <MonthlyBarChart data={monthlyRevenue} color="#2563eb" />
         </div>
         <div>
           <h2 className="mb-4 font-medium">Invoices by month ({year})</h2>
-          <MonthlyBarChart
-            data={monthlyVolume}
-            formatValue={(v) => v.toLocaleString()}
-            color="#ea580c"
-          />
+          <MonthlyBarChart data={monthlyVolume} color="#ea580c" />
         </div>
       </div>
 

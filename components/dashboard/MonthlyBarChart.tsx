@@ -9,6 +9,9 @@ export interface MonthlyBarDatum {
   /** YYYY-MM, used to link a bar to that month's invoices. */
   monthValue: string;
   value: number;
+  /** Pre-formatted for the hover tooltip — a function can't cross the
+   * server/client boundary, so formatting happens server-side instead. */
+  displayValue: string;
 }
 
 const CHART_HEIGHT_PX = 140;
@@ -20,15 +23,7 @@ const CHART_HEIGHT_PX = 140;
  * month's filtered Review list. One series needs no legend (the section
  * heading above it names the metric).
  */
-export function MonthlyBarChart({
-  data,
-  formatValue,
-  color,
-}: {
-  data: MonthlyBarDatum[];
-  formatValue: (value: number) => string;
-  color: string;
-}) {
+export function MonthlyBarChart({ data, color }: { data: MonthlyBarDatum[]; color: string }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const max = Math.max(1, ...data.map((d) => d.value));
 
@@ -48,7 +43,7 @@ export function MonthlyBarChart({
             >
               {hoverIndex === i && (
                 <div className="absolute -top-7 z-10 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white">
-                  {formatValue(d.value)}
+                  {d.displayValue}
                 </div>
               )}
               <div
