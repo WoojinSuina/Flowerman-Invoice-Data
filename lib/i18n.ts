@@ -6,7 +6,7 @@
 export const translations = {
   // Navigation
   dashboard: { ja: "ダッシュボード", en: "Dashboard" },
-  review: { ja: "確認", en: "Review" },
+  review: { ja: "請求書", en: "Invoices" },
   jobs: { ja: "作業", en: "Jobs" },
   stores: { ja: "店舗", en: "Stores" },
   products: { ja: "商品", en: "Products" },

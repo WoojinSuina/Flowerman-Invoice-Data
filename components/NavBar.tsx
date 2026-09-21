@@ -6,12 +6,12 @@ import type { TranslationKey } from "@/lib/i18n";
 
 const LINKS: { href: string; key: TranslationKey }[] = [
   { href: "/dashboard", key: "dashboard" },
-  { href: "/review", key: "review" },
   { href: "/jobs", key: "jobs" },
-  { href: "/stores", key: "stores" },
-  { href: "/products", key: "products" },
+  { href: "/review", key: "review" },
   { href: "/recommendations", key: "recommendations" },
   { href: "/reconciliation", key: "reconciliation" },
+  { href: "/stores", key: "stores" },
+  { href: "/products", key: "products" },
 ];
 
 export async function NavBar() {
