@@ -1,6 +1,5 @@
 import { after } from "next/server";
 import { prisma } from "@/lib/db/client";
-import { isConsignmentStore } from "@/lib/stores";
 import { findWeekOffsetInvoices } from "./weekOffsetDates";
 
 export interface ClaimedPage {
@@ -43,24 +42,19 @@ export async function claimNextPendingPage(): Promise<ClaimedPage | null> {
 }
 
 /**
- * A consignment store sometimes delivers using a leftover invoice form
- * from the prior week, so the printed date reads a week early compared to
- * the rest of the same batch. Runs once the whole batch is in so the
- * "most common date" anchor it compares against is reliable, and only
- * ever nudges consignment invoices forward — see findWeekOffsetInvoices.
+ * A store's invoice can end up written on a leftover form from the prior
+ * week's pad, so the printed date reads a week early even though the
+ * delivery itself happened on schedule. Runs once the whole batch is in
+ * so the "most common week" anchor it compares against is reliable, and
+ * nudges forward any invoice landing exactly one week before it — see
+ * findWeekOffsetInvoices.
  */
 async function reconcileWeekOffsetDates(processingJobId: string): Promise<void> {
   const invoices = await prisma.invoice.findMany({
     where: { processingJobId },
-    select: { id: true, invoiceDate: true, store: { select: { name: true, address: true } } },
+    select: { id: true, invoiceDate: true },
   });
-  const corrections = findWeekOffsetInvoices(
-    invoices.map((inv) => ({
-      id: inv.id,
-      invoiceDate: inv.invoiceDate,
-      isConsignment: isConsignmentStore(inv.store),
-    }))
-  );
+  const corrections = findWeekOffsetInvoices(invoices);
   for (const correction of corrections) {
     await prisma.invoice.update({
       where: { id: correction.id },
