@@ -182,7 +182,7 @@ export default async function DashboardPage(props: {
       qtyUnsold: (row._sum.deliveredQuantity ?? 0) - (row._sum.soldQuantity ?? 0),
       percentSold: percentSold(row._sum.soldQuantity ?? 0, row._sum.deliveredQuantity ?? 0),
     }))
-    .sort((a, b) => (b.percentSold ?? -1) - (a.percentSold ?? -1))
+    .sort((a, b) => (b._sum.netSoldAmountCents ?? 0) - (a._sum.netSoldAmountCents ?? 0))
     .slice(0, 5);
   const products = await prisma.product.findMany({
     where: { id: { in: topProductsRaw.map((p) => p.productId as string) } },
