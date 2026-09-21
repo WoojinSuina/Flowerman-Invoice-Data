@@ -21,12 +21,10 @@ import {
 import type { Prisma, ValidationStatus } from "@prisma/client";
 
 const FILTERS: (ValidationStatus | "ALL" | "AUTO_APPROVED")[] = [
+  "ALL",
   "REVIEW",
-  "PASS",
   "APPROVED",
   "AUTO_APPROVED",
-  "FAILED",
-  "ALL",
 ];
 const FILTER_LABELS: Record<string, string> = { AUTO_APPROVED: "AUTO-APPROVED" };
 const PAGE_SIZE = 25;
