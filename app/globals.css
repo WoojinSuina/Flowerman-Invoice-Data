@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Any content that genuinely needs to scroll horizontally (wide tables,
+   the monthly chart) already has its own overflow-x-auto container —
+   this is a safety net against something else overflowing and dragging
+   the whole page sideways on a phone instead of staying centered. */
+html,
+body {
+  overflow-x: hidden;
+}
+
 /* Elderly/large-text mode (lib/elderlyMode.ts) — always on, see there.
    Tailwind's spacing and font-size scales are rem-based, so bumping the
    root font-size scales nearly everything in the app proportionally —
