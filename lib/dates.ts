@@ -75,11 +75,31 @@ function validUtcDate(year: number, monthIndex: number, day: number): Date | nul
   return date;
 }
 
+// A typed "M/D" with no year almost always means the most recent
+// occurrence of that date — an invoice can never be dated in the future
+// (see isFutureDate), so if this year's version of that day hasn't
+// happened yet, they meant last year's instead.
+function inferYearAndBuildDate(monthIndex: number, day: number): Date | null {
+  const now = new Date();
+  const candidate = validUtcDate(now.getUTCFullYear(), monthIndex, day);
+  if (!candidate) return null;
+  const todayUtcMidnight = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  if (candidate.getTime() > todayUtcMidnight.getTime()) {
+    return validUtcDate(now.getUTCFullYear() - 1, monthIndex, day);
+  }
+  return candidate;
+}
+
 // Parses a free-typed search box date (the Review search bar) into a UTC
 // midnight Date, or null if it doesn't look like a date at all — in which
 // case the caller falls back to matching invoice #/store name instead.
-// Accepts "YYYY-MM-DD" and US "M/D/YYYY" or "M/D/YY" (2-digit year prefixed
-// with "20", same convention the extraction prompt uses).
+// Accepts "YYYY-MM-DD"; US "M/D/YYYY" or "M/D/YY" (2-digit year prefixed
+// with "20", same convention the extraction prompt uses) with either "/"
+// or "-" as the separator; and a bare "M/D" or "M-D" with the year
+// inferred (see inferYearAndBuildDate) since typing a full year for a
+// quick lookup is a lot to ask.
 export function parseSearchDate(input: string): Date | null {
   const trimmed = input.trim();
 
@@ -89,11 +109,17 @@ export function parseSearchDate(input: string): Date | null {
     return validUtcDate(Number(y), Number(m) - 1, Number(d));
   }
 
-  const us = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
-  if (us) {
-    const [, m, d, yRaw] = us;
+  const withYear = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/);
+  if (withYear) {
+    const [, m, d, yRaw] = withYear;
     const year = yRaw.length === 2 ? 2000 + Number(yRaw) : Number(yRaw);
     return validUtcDate(year, Number(m) - 1, Number(d));
+  }
+
+  const withoutYear = trimmed.match(/^(\d{1,2})[/-](\d{1,2})$/);
+  if (withoutYear) {
+    const [, m, d] = withoutYear;
+    return inferYearAndBuildDate(Number(m) - 1, Number(d));
   }
 
   return null;
