@@ -12,6 +12,11 @@ export interface MonthlyBarDatum {
 }
 
 const CHART_HEIGHT_PX = 140;
+// A fixed per-month column width (rather than flex-1 splitting the
+// available width) so 12 months of labeled bars stay legible instead of
+// being squeezed to fit a narrow screen — the chart scrolls horizontally
+// on a phone instead.
+const COLUMN_WIDTH_PX = 56;
 
 /**
  * A single-series bar chart for one metric across the 12 months of a year.
@@ -38,10 +43,11 @@ export function MonthlyBarChart({
   todayMonthValue?: string;
 }) {
   const max = Math.max(1, ...data.map((d) => d.value));
+  const totalWidth = data.length * COLUMN_WIDTH_PX;
 
   return (
-    <div>
-      <div className="flex items-end gap-2" style={{ height: CHART_HEIGHT_PX + 28 }}>
+    <div className="overflow-x-auto">
+      <div className="flex items-end" style={{ height: CHART_HEIGHT_PX + 28, minWidth: totalWidth }}>
         {data.map((d) => {
           const isSelected = d.monthValue === selectedMonthValue;
           const isToday = d.monthValue === todayMonthValue;
@@ -52,10 +58,10 @@ export function MonthlyBarChart({
               href={`/dashboard?month=${d.monthValue}`}
               className={
                 isSelected
-                  ? "group relative flex flex-1 flex-col items-center justify-end rounded-lg border-2 border-amber-400 bg-amber-50"
-                  : "group relative flex flex-1 flex-col items-center justify-end rounded-lg border-2 border-transparent hover:bg-gray-50"
+                  ? "group relative flex flex-col items-center justify-end rounded-lg border-2 border-amber-400 bg-amber-50"
+                  : "group relative flex flex-col items-center justify-end rounded-lg border-2 border-transparent hover:bg-gray-50"
               }
-              style={{ height: CHART_HEIGHT_PX + 28 }}
+              style={{ flex: `1 0 ${COLUMN_WIDTH_PX}px`, height: CHART_HEIGHT_PX + 28 }}
             >
               {isToday && (
                 <span
@@ -75,16 +81,16 @@ export function MonthlyBarChart({
               <div
                 className={
                   isSelected
-                    ? "w-full rounded-t ring-2 ring-offset-1 ring-amber-500"
-                    : "w-full rounded-t transition-opacity group-hover:opacity-80"
+                    ? "w-6 rounded-t ring-2 ring-offset-1 ring-amber-500"
+                    : "w-6 rounded-t transition-opacity group-hover:opacity-80"
                 }
-                style={{ height: barHeight, backgroundColor: color, minWidth: 6 }}
+                style={{ height: barHeight, backgroundColor: color }}
               />
             </Link>
           );
         })}
       </div>
-      <div className="mt-1 flex gap-2 text-xs">
+      <div className="mt-1 flex" style={{ minWidth: totalWidth }}>
         {data.map((d) => {
           const isSelected = d.monthValue === selectedMonthValue;
           const isToday = d.monthValue === todayMonthValue;
@@ -93,11 +99,12 @@ export function MonthlyBarChart({
               key={d.monthValue}
               className={
                 isSelected
-                  ? "flex-1 text-center font-bold text-amber-800"
+                  ? "text-center text-xs font-bold text-amber-800"
                   : isToday
-                    ? "flex-1 text-center font-semibold text-blue-700"
-                    : "flex-1 text-center text-gray-500"
+                    ? "text-center text-xs font-semibold text-blue-700"
+                    : "text-center text-xs text-gray-500"
               }
+              style={{ flex: `1 0 ${COLUMN_WIDTH_PX}px` }}
             >
               {d.label}
             </div>
