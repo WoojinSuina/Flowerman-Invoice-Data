@@ -17,7 +17,7 @@ const CHART_HEIGHT_PX = 140;
  * A single-series bar chart for one metric across the 12 months of a year.
  * Plain divs, not a charting library — thin bars anchored to the baseline,
  * a direct value label above each bar, the currently-viewed month
- * highlighted, and each bar links to that month's filtered Review list.
+ * highlighted, and each bar links to the Dashboard for that month.
  * One series needs no legend (the section heading above it names the
  * metric). No client interactivity needed (labels are always visible, not
  * hover-only), so this renders as a plain Server Component.
@@ -42,7 +42,7 @@ export function MonthlyBarChart({
           return (
             <Link
               key={d.monthValue}
-              href={`/review?status=ALL&month=${d.monthValue}`}
+              href={`/dashboard?month=${d.monthValue}`}
               className={`group flex flex-1 flex-col items-center justify-end rounded ${
                 isCurrent ? "bg-gray-100" : "hover:bg-gray-50"
               }`}
