@@ -28,8 +28,9 @@ export interface MismatchedInvoice {
   storeAddress: string | null;
   writtenCents: number;
   calculatedCents: number;
-  // calculated - written: positive = gain (underpaid relative to the
-  // math), negative = loss (overpaid relative to the math).
+  // written - calculated: positive = gain (the store is being charged
+  // more than the line items justify, which is more revenue for us),
+  // negative = loss (charged less than the math says they owe).
   impactCents: number;
   classification: MismatchClassification;
 }
@@ -66,7 +67,7 @@ export async function getMismatchedInvoices(): Promise<MismatchedInvoice[]> {
     storeAddress: inv.store.address,
     writtenCents: inv.totalAmountDueCents,
     calculatedCents: inv.calculatedAmountDueCents,
-    impactCents: -inv.validationDifferenceCents,
+    impactCents: inv.validationDifferenceCents,
     classification:
       Math.abs(inv.validationDifferenceCents) >= LIKELY_MISREAD_THRESHOLD_CENTS
         ? "likely_misread"

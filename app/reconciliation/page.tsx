@@ -91,7 +91,7 @@ export default async function ReconciliationPage(props: {
       <p className="mb-4 text-sm text-gray-500">
         What it costs (or saves) to approve an invoice on its written total when
         the line items add up to something else — a written total higher than
-        the math is a loss, lower is a gain.
+        the math is a gain for us, lower is a loss.
       </p>
 
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
