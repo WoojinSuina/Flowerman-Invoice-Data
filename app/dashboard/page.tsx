@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/client";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatWholeDollars } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MonthSelect } from "@/components/dashboard/MonthSelect";
 import { StoreListModal } from "@/components/dashboard/StoreListModal";
@@ -87,7 +87,7 @@ export default async function DashboardPage(props: {
       prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
       prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
       prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
-      getMismatchedInvoices(),
+      getMismatchedInvoices({ gte: monthStart, lt: nextMonthStart }),
       prisma.$queryRaw<{ month: string; revenue_cents: number }[]>`
       SELECT to_char(invoice_date, 'YYYY-MM') AS month,
              SUM(calculated_amount_due_cents)::int AS revenue_cents
@@ -112,7 +112,7 @@ export default async function DashboardPage(props: {
       label,
       monthValue,
       value: revenueCents,
-      displayValue: formatCents(revenueCents),
+      displayValue: formatWholeDollars(revenueCents),
     });
   }
 
@@ -236,7 +236,7 @@ export default async function DashboardPage(props: {
         <StatTile
           label="Write-in error impact"
           value={formatCents(reconciliationSummary.approvedNetCents)}
-          sub="approved invoices, all-time"
+          sub={`approved invoices, ${monthLabel}`}
           href="/reconciliation"
         />
       </div>

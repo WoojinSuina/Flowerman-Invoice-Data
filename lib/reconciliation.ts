@@ -35,14 +35,24 @@ export interface MismatchedInvoice {
   classification: MismatchClassification;
 }
 
-/** Every invoice where the written total and the line-item math disagree by more than rounding. */
-export async function getMismatchedInvoices(): Promise<MismatchedInvoice[]> {
+/**
+ * Every invoice where the written total and the line-item math disagree
+ * by more than rounding. Pass `invoiceDateRange` to scope this to one
+ * month (e.g. the Dashboard's "Write-in error impact" tile, which should
+ * track whichever month is currently selected there) — omitted, this is
+ * all-time (e.g. the Reconciliation page, which audits the whole history).
+ */
+export async function getMismatchedInvoices(invoiceDateRange?: {
+  gte: Date;
+  lt: Date;
+}): Promise<MismatchedInvoice[]> {
   const invoices = await prisma.invoice.findMany({
     where: {
       OR: [
         { validationDifferenceCents: { gt: CURRENCY_TOLERANCE_CENTS } },
         { validationDifferenceCents: { lt: -CURRENCY_TOLERANCE_CENTS } },
       ],
+      ...(invoiceDateRange ? { invoiceDate: invoiceDateRange } : {}),
     },
     select: {
       id: true,

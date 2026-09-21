@@ -35,7 +35,7 @@ export function MonthlyBarChart({
 
   return (
     <div>
-      <div className="flex items-end gap-2" style={{ height: CHART_HEIGHT_PX + 20 }}>
+      <div className="flex items-end gap-2" style={{ height: CHART_HEIGHT_PX + 28 }}>
         {data.map((d) => {
           const isCurrent = d.monthValue === highlightMonthValue;
           const barHeight = d.value > 0 ? Math.max(4, Math.round((d.value / max) * CHART_HEIGHT_PX)) : 0;
@@ -43,16 +43,28 @@ export function MonthlyBarChart({
             <Link
               key={d.monthValue}
               href={`/dashboard?month=${d.monthValue}`}
-              className={`group flex flex-1 flex-col items-center justify-end rounded ${
-                isCurrent ? "bg-gray-100" : "hover:bg-gray-50"
-              }`}
-              style={{ height: CHART_HEIGHT_PX + 20 }}
+              className={
+                isCurrent
+                  ? "group flex flex-1 flex-col items-center justify-end rounded-lg border-2 border-amber-400 bg-amber-50"
+                  : "group flex flex-1 flex-col items-center justify-end rounded-lg border-2 border-transparent hover:bg-gray-50"
+              }
+              style={{ height: CHART_HEIGHT_PX + 28 }}
             >
-              <div className="mb-1 whitespace-nowrap text-[10px] leading-none text-gray-500 group-hover:text-gray-900">
+              <div
+                className={
+                  isCurrent
+                    ? "mb-1 whitespace-nowrap text-xs font-semibold leading-none tabular-nums text-amber-800"
+                    : "mb-1 whitespace-nowrap text-xs font-medium leading-none tabular-nums text-gray-600 group-hover:text-gray-900"
+                }
+              >
                 {d.displayValue}
               </div>
               <div
-                className="w-full rounded-t transition-opacity group-hover:opacity-80"
+                className={
+                  isCurrent
+                    ? "w-full rounded-t ring-2 ring-offset-1 ring-amber-500"
+                    : "w-full rounded-t transition-opacity group-hover:opacity-80"
+                }
                 style={{ height: barHeight, backgroundColor: color, minWidth: 6 }}
               />
             </Link>
@@ -65,7 +77,7 @@ export function MonthlyBarChart({
             key={d.monthValue}
             className={
               d.monthValue === highlightMonthValue
-                ? "flex-1 text-center font-semibold text-gray-900"
+                ? "flex-1 text-center font-bold text-amber-800"
                 : "flex-1 text-center text-gray-500"
             }
           >

@@ -31,3 +31,14 @@ export function formatCents(cents: number): string {
 }
 
 export const CURRENCY_TOLERANCE_CENTS = 1; // $0.01, per spec §3
+
+/**
+ * Format cents as whole dollars, e.g. 3625225 -> "$36,252" — for compact
+ * display (chart labels, etc.) where exact cents add clutter without
+ * adding useful information at that scale.
+ */
+export function formatWholeDollars(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const dollars = Math.round(Math.abs(cents) / 100);
+  return `${sign}$${dollars.toLocaleString("en-US")}`;
+}
