@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { processInvoicePage } from "@/lib/invoices/processInvoicePage";
-import { claimNextPendingPage, maybeCompleteJob, triggerPageProcessing } from "@/lib/invoices/pageQueue";
+import { claimNextPendingPage, dispatchNextHop, maybeCompleteJob, type ClaimedPage } from "@/lib/invoices/pageQueue";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,20 +20,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ processed: false, reason: "queue empty" });
   }
 
-  // Dispatch the next hop right away, concurrently with this page's own
-  // processing, rather than waiting until this page fully finishes —
-  // claimNextPendingPage's SKIP LOCKED exists precisely so overlapping
-  // invocations can't collide. Chaining the trigger after a slow Claude
-  // Vision call let that call eat this invocation's whole maxDuration
-  // budget before the next hop could even be dispatched, silently
-  // stalling the queue a few hops in.
-  triggerPageProcessing(req.nextUrl.origin);
+  const origin = req.nextUrl.origin;
 
-  // Everything below can fail in ways that have nothing to do with this
-  // specific page (a transient DB hiccup, a network blip fetching from
-  // Storage) — the next hop above is already dispatched regardless, so a
-  // failure here just drops this one page (its claim goes stale and gets
-  // reclaimed in a few minutes if it's still stuck).
+  // `after()` only runs once this response is fully sent, so the dispatch
+  // and this page's own processing must be started CONCURRENTLY inside the
+  // same callback — sequencing them (dispatch, then await processing, or
+  // vice versa) confirmed live to chain every hop's entire Claude Vision
+  // time onto the next hop's dispatch, since after() has no way to fire an
+  // "earlier" step separately from a "later" one within a single response.
+  after(async () => {
+    await Promise.allSettled([dispatchNextHop(origin), processClaimedPage(claimed)]);
+  });
+
+  return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage });
+}
+
+// Everything here can fail in ways that have nothing to do with the next
+// hop (a transient DB hiccup, a network blip fetching from Storage) — the
+// next hop is dispatched independently in POST above, so a failure here
+// just drops this one page (its claim goes stale and gets reclaimed in a
+// few minutes if it's still stuck).
+async function processClaimedPage(claimed: ClaimedPage): Promise<void> {
   try {
     const fileRes = await fetch(claimed.storageUrl);
     if (!fileRes.ok) {
@@ -57,7 +64,7 @@ export async function POST(req: NextRequest) {
       });
       await prisma.pendingPage.delete({ where: { id: claimed.id } });
       await maybeCompleteJob(claimed.processingJobId);
-      return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: false });
+      return;
     }
     const buffer = Buffer.from(await fileRes.arrayBuffer());
 
@@ -90,13 +97,7 @@ export async function POST(req: NextRequest) {
     });
     await prisma.pendingPage.delete({ where: { id: claimed.id } });
     await maybeCompleteJob(claimed.processingJobId);
-
-    return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: result.ok });
   } catch (err) {
     console.error(`process-next: unhandled error on page ${claimed.sourcePage} (${claimed.id}):`, err);
-    return NextResponse.json(
-      { processed: false, sourcePage: claimed.sourcePage, error: (err as Error).message },
-      { status: 500 }
-    );
   }
 }
