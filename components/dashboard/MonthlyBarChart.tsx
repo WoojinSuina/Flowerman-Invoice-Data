@@ -16,9 +16,10 @@ const CHART_HEIGHT_PX = 140;
 /**
  * A single-series bar chart for one metric across the 12 months of a year.
  * Plain divs, not a charting library — thin bars anchored to the baseline,
- * a direct value label above each bar, the currently-viewed month
- * highlighted, and each bar links to the Dashboard for that month.
- * One series needs no legend (the section heading above it names the
+ * a direct value label above each bar, today's real calendar month
+ * highlighted (regardless of which month the rest of the page is
+ * scoped to via the picker), and each bar links to the Dashboard for
+ * that month. One series needs no legend (the section heading above it names the
  * metric). No client interactivity needed (labels are always visible, not
  * hover-only), so this renders as a plain Server Component.
  */
