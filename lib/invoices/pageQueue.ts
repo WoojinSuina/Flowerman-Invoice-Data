@@ -67,20 +67,34 @@ export async function maybeCompleteJob(processingJobId: string): Promise<void> {
  * the function's execution environment isn't guaranteed to stay alive for
  * work that isn't tracked via `waitUntil`/`after()`. Must be called
  * synchronously during request handling (Next.js requirement for `after`).
+ *
+ * Only waits a few seconds for the request to be dispatched, not for the
+ * next page to finish processing — confirmed live that awaiting the full
+ * response chained the next hop's entire Claude Vision processing time
+ * onto this invocation's own `maxDuration` budget, and once that ran out
+ * mid-`after()` the outbound fetch never made it out, silently killing the
+ * whole chain a few hops in. Aborting here only stops *this* invocation
+ * from waiting on the response; the next invocation keeps running once
+ * dispatched regardless of whether anyone is still listening for its reply.
  */
 export function triggerPageProcessing(origin: string): void {
   after(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
       await fetch(`${origin}/api/jobs/process-next`, {
         method: "POST",
         // No browser session cookie exists for a server-to-server call —
         // proxy.ts accepts this header as an alternative for this one path.
         headers: { "x-internal-secret": process.env.AUTH_SECRET ?? "" },
+        signal: controller.signal,
       });
     } catch {
       // Best-effort kick — if this particular trigger fails, the next
       // upload's own trigger (or the periodic sweep) picks the queue back
       // up regardless.
+    } finally {
+      clearTimeout(timeout);
     }
   });
 }

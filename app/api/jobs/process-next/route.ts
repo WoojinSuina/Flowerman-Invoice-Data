@@ -20,15 +20,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ processed: false, reason: "queue empty" });
   }
 
+  // Dispatch the next hop right away, concurrently with this page's own
+  // processing, rather than waiting until this page fully finishes —
+  // claimNextPendingPage's SKIP LOCKED exists precisely so overlapping
+  // invocations can't collide. Chaining the trigger after a slow Claude
+  // Vision call let that call eat this invocation's whole maxDuration
+  // budget before the next hop could even be dispatched, silently
+  // stalling the queue a few hops in.
+  triggerPageProcessing(req.nextUrl.origin);
+
   // Everything below can fail in ways that have nothing to do with this
   // specific page (a transient DB hiccup, a network blip fetching from
-  // Storage) — confirmed live that an uncaught error here silently killed
-  // the whole chain, since triggerPageProcessing() was never reached,
-  // and nothing else was going to call this route again on its own. The
-  // chain must survive a single bad link: on any failure, still trigger
-  // the next call so the queue keeps moving (claimNextPendingPage's
-  // SKIP LOCKED just picks a different page next time; this one's claim
-  // goes stale and gets reclaimed in a few minutes if it's still stuck).
+  // Storage) — the next hop above is already dispatched regardless, so a
+  // failure here just drops this one page (its claim goes stale and gets
+  // reclaimed in a few minutes if it's still stuck).
   try {
     const fileRes = await fetch(claimed.storageUrl);
     if (!fileRes.ok) {
@@ -52,7 +57,6 @@ export async function POST(req: NextRequest) {
       });
       await prisma.pendingPage.delete({ where: { id: claimed.id } });
       await maybeCompleteJob(claimed.processingJobId);
-      triggerPageProcessing(req.nextUrl.origin);
       return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: false });
     }
     const buffer = Buffer.from(await fileRes.arrayBuffer());
@@ -87,12 +91,9 @@ export async function POST(req: NextRequest) {
     await prisma.pendingPage.delete({ where: { id: claimed.id } });
     await maybeCompleteJob(claimed.processingJobId);
 
-    triggerPageProcessing(req.nextUrl.origin);
-
     return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: result.ok });
   } catch (err) {
     console.error(`process-next: unhandled error on page ${claimed.sourcePage} (${claimed.id}):`, err);
-    triggerPageProcessing(req.nextUrl.origin);
     return NextResponse.json(
       { processed: false, sourcePage: claimed.sourcePage, error: (err as Error).message },
       { status: 500 }
