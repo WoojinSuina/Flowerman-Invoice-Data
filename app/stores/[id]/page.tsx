@@ -35,34 +35,36 @@ export default async function StoreDetailPage(props: { params: Promise<{ id: str
       {invoices.length === 0 ? (
         <p className="text-gray-500">No invoices for this store yet.</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">Invoice #</th>
-              <th className="py-2 pr-4">Date</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Difference</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                <td className="py-2 pr-4">
-                  <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
-                    {invoice.invoiceNumber}
-                  </Link>
-                </td>
-                <td className="py-2 pr-4">{formatInvoiceDate(invoice.invoiceDate)}</td>
-                <td className="py-2 pr-4">
-                  <StatusBadge status={invoice.validationStatus} />
-                </td>
-                <td className="py-2 pr-4 tabular-nums">
-                  {formatCents(invoice.validationDifferenceCents)}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">Invoice #</th>
+                <th className="py-2 pr-4">Date</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Difference</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 pr-4">
+                    <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
+                      {invoice.invoiceNumber}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-4">{formatInvoiceDate(invoice.invoiceDate)}</td>
+                  <td className="py-2 pr-4">
+                    <StatusBadge status={invoice.validationStatus} />
+                  </td>
+                  <td className="py-2 pr-4 tabular-nums">
+                    {formatCents(invoice.validationDifferenceCents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );

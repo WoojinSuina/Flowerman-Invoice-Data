@@ -52,7 +52,7 @@ export function ReviewFilters({
         value={searchText}
         onChange={(e) => setSearchText(e.target.value)}
         placeholder="Search invoice #, store, or date (e.g. 9/17)"
-        className="w-72 rounded border px-2 py-1 text-sm"
+        className="w-full rounded border px-2 py-1 text-sm sm:w-72"
       />
 
       <select

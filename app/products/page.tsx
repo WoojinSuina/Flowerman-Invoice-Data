@@ -37,45 +37,47 @@ export default async function ProductsListPage() {
           No product data yet — this fills in as invoices are processed.
         </p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">Product</th>
-              <th className="py-2 pr-4">Qty sold</th>
-              <th className="py-2 pr-4">Revenue</th>
-              <th className="py-2 pr-4">Times seen</th>
-              <th className="py-2 pr-4">Avg. confidence</th>
-              <th className="py-2 pr-4">Duplicate?</th>
-            </tr>
-          </thead>
-          <tbody>
-            {aggregates.map((row) => {
-              const product = row.productId ? productById.get(row.productId) : undefined;
-              const avgConfidence = row._avg.confidence;
-              const otherProducts = products
-                .filter((p) => p.id !== row.productId)
-                .map((p) => ({ id: p.id, name: p.name }));
-              return (
-                <tr key={row.productId} className="border-b">
-                  <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
-                  <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
-                  <td className="py-2 pr-4 tabular-nums">
-                    {formatCents(row._sum.netSoldAmountCents ?? 0)}
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">{row._count}</td>
-                  <td className="py-2 pr-4 tabular-nums">
-                    {avgConfidence !== null ? `${Math.round(avgConfidence * 100)}%` : "—"}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {row.productId && (
-                      <MergeProductButton productId={row.productId} otherProducts={otherProducts} />
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">Product</th>
+                <th className="py-2 pr-4">Qty sold</th>
+                <th className="py-2 pr-4">Revenue</th>
+                <th className="py-2 pr-4">Times seen</th>
+                <th className="py-2 pr-4">Avg. confidence</th>
+                <th className="py-2 pr-4">Duplicate?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aggregates.map((row) => {
+                const product = row.productId ? productById.get(row.productId) : undefined;
+                const avgConfidence = row._avg.confidence;
+                const otherProducts = products
+                  .filter((p) => p.id !== row.productId)
+                  .map((p) => ({ id: p.id, name: p.name }));
+                return (
+                  <tr key={row.productId} className="border-b">
+                    <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
+                    <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
+                    <td className="py-2 pr-4 tabular-nums">
+                      {formatCents(row._sum.netSoldAmountCents ?? 0)}
+                    </td>
+                    <td className="py-2 pr-4 tabular-nums">{row._count}</td>
+                    <td className="py-2 pr-4 tabular-nums">
+                      {avgConfidence !== null ? `${Math.round(avgConfidence * 100)}%` : "—"}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {row.productId && (
+                        <MergeProductButton productId={row.productId} otherProducts={otherProducts} />
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );

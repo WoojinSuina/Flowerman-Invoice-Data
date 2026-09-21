@@ -29,49 +29,51 @@ export default async function StoresListPage() {
       {stores.length === 0 ? (
         <p className="text-gray-500">No stores yet.</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">Store</th>
-              <th className="py-2 pr-4">Store #</th>
-              <th className="py-2 pr-4">Type</th>
-              <th className="py-2 pr-4">Invoices</th>
-              <th className="py-2 pr-4">Revenue</th>
-              <th className="py-2 pr-4">Duplicate?</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stores.map((store) => {
-              const agg = aggregateByStoreId.get(store.id);
-              const otherStores = stores
-                .filter((s) => s.id !== store.id)
-                .map((s) => ({ id: s.id, name: s.name, address: s.address }));
-              return (
-                <tr key={store.id} className="border-b hover:bg-gray-50">
-                  <td className="py-2 pr-4">
-                    <Link href={`/stores/${store.id}`} className="text-blue-600 underline">
-                      {store.name}
-                    </Link>
-                    {store.address && (
-                      <div className="text-xs text-gray-500">{store.address}</div>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4">{store.storeNumber}</td>
-                  <td className="py-2 pr-4">
-                    <StoreTypeBadge consignment={isConsignmentStore(store)} />
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">{agg?._count ?? 0}</td>
-                  <td className="py-2 pr-4 tabular-nums">
-                    {formatCents(agg?._sum.calculatedAmountDueCents ?? 0)}
-                  </td>
-                  <td className="py-2 pr-4">
-                    <MergeStoreButton storeId={store.id} otherStores={otherStores} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">Store</th>
+                <th className="py-2 pr-4">Store #</th>
+                <th className="py-2 pr-4">Type</th>
+                <th className="py-2 pr-4">Invoices</th>
+                <th className="py-2 pr-4">Revenue</th>
+                <th className="py-2 pr-4">Duplicate?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stores.map((store) => {
+                const agg = aggregateByStoreId.get(store.id);
+                const otherStores = stores
+                  .filter((s) => s.id !== store.id)
+                  .map((s) => ({ id: s.id, name: s.name, address: s.address }));
+                return (
+                  <tr key={store.id} className="border-b hover:bg-gray-50">
+                    <td className="py-2 pr-4">
+                      <Link href={`/stores/${store.id}`} className="text-blue-600 underline">
+                        {store.name}
+                      </Link>
+                      {store.address && (
+                        <div className="text-xs text-gray-500">{store.address}</div>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4">{store.storeNumber}</td>
+                    <td className="py-2 pr-4">
+                      <StoreTypeBadge consignment={isConsignmentStore(store)} />
+                    </td>
+                    <td className="py-2 pr-4 tabular-nums">{agg?._count ?? 0}</td>
+                    <td className="py-2 pr-4 tabular-nums">
+                      {formatCents(agg?._sum.calculatedAmountDueCents ?? 0)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <MergeStoreButton storeId={store.id} otherStores={otherStores} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );

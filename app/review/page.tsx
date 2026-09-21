@@ -132,7 +132,7 @@ export default async function ReviewListPage(props: {
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Invoice Review</h1>
 
-      <nav className="mb-4 flex gap-2">
+      <nav className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <Link
             key={f}
@@ -161,49 +161,51 @@ export default async function ReviewListPage(props: {
       {invoices.length === 0 ? (
         <p className="text-gray-500">No invoices match these filters.</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">Invoice #</th>
-              <th className="py-2 pr-4">Store</th>
-              <th className="py-2 pr-4">Date</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Difference</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                <td className="py-2 pr-4">
-                  <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
-                    {invoice.invoiceNumber}
-                  </Link>
-                </td>
-                <td className="py-2 pr-4">
-                  {invoice.store.name}
-                  {invoice.store.address && (
-                    <div className="text-xs text-gray-500">{invoice.store.address}</div>
-                  )}
-                </td>
-                <td className="py-2 pr-4">
-                  {formatInvoiceDate(invoice.invoiceDate)}
-                </td>
-                <td className="py-2 pr-4">
-                  <StatusBadge status={invoice.validationStatus} />
-                  {invoice.autoApprovedReason && (
-                    <span
-                      className="ml-1 text-xs text-gray-400"
-                      title={invoice.autoApprovedReason}
-                    >
-                      (auto)
-                    </span>
-                  )}
-                </td>
-                <td className="py-2 pr-4">{formatCents(invoice.validationDifferenceCents)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">Invoice #</th>
+                <th className="py-2 pr-4">Store</th>
+                <th className="py-2 pr-4">Date</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Difference</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 pr-4">
+                    <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
+                      {invoice.invoiceNumber}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-4">
+                    {invoice.store.name}
+                    {invoice.store.address && (
+                      <div className="text-xs text-gray-500">{invoice.store.address}</div>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {formatInvoiceDate(invoice.invoiceDate)}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <StatusBadge status={invoice.validationStatus} />
+                    {invoice.autoApprovedReason && (
+                      <span
+                        className="ml-1 text-xs text-gray-400"
+                        title={invoice.autoApprovedReason}
+                      >
+                        (auto)
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4">{formatCents(invoice.validationDifferenceCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {totalCount > 0 && (

@@ -255,31 +255,33 @@ export default async function DashboardPage(props: {
         {weeklyRevenue.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet.</p>
         ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-4">Week</th>
-                <th className="py-2 pr-4">Invoices</th>
-                <th className="py-2 pr-4">Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {weeklyRevenue.map((week) => (
-                <tr key={week.weekStart.toISOString()} className="border-b">
-                  <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
-                  <td className="py-2 pr-4 tabular-nums">
-                    <Link
-                      href={`/review?status=ALL&week=${weekParam(week.weekStart)}`}
-                      className="text-blue-600 underline"
-                    >
-                      {week.count}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="py-2 pr-4">Week</th>
+                  <th className="py-2 pr-4">Invoices</th>
+                  <th className="py-2 pr-4">Revenue</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {weeklyRevenue.map((week) => (
+                  <tr key={week.weekStart.toISOString()} className="border-b">
+                    <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
+                    <td className="py-2 pr-4 tabular-nums">
+                      <Link
+                        href={`/review?status=ALL&week=${weekParam(week.weekStart)}`}
+                        className="text-blue-600 underline"
+                      >
+                        {week.count}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -294,43 +296,45 @@ export default async function DashboardPage(props: {
           {topFiveStores.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Store</th>
-                  <th className="py-2 pr-4">Delivered</th>
-                  <th className="py-2 pr-4">Sold</th>
-                  <th className="py-2 pr-4">Unsold</th>
-                  <th className="py-2 pr-4">% sold</th>
-                  <th className="py-2 pr-4">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topFiveStores.map((row) => {
-                  const store = storeById.get(row.storeId);
-                  return (
-                    <tr key={row.storeId} className="border-b">
-                      <td className="py-2 pr-4">
-                        <Link
-                          href={`/review?status=ALL&store=${row.storeId}&month=${monthParam(monthStart)}`}
-                          className="text-blue-600 underline"
-                        >
-                          {store?.name ?? row.storeId}
-                        </Link>
-                        {store?.address && (
-                          <div className="text-xs text-gray-500">{store.address}</div>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4 tabular-nums">{row.qtyDelivered}</td>
-                      <td className="py-2 pr-4 tabular-nums">{row.qtySold}</td>
-                      <td className="py-2 pr-4 tabular-nums">{row.qtyUnsold}</td>
-                      <td className="py-2 pr-4 tabular-nums">{formatPercent(row.percentSold)}</td>
-                      <td className="py-2 pr-4 tabular-nums">{formatCents(row.revenueCents)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-2 pr-4">Store</th>
+                    <th className="py-2 pr-4">Delivered</th>
+                    <th className="py-2 pr-4">Sold</th>
+                    <th className="py-2 pr-4">Unsold</th>
+                    <th className="py-2 pr-4">% sold</th>
+                    <th className="py-2 pr-4">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topFiveStores.map((row) => {
+                    const store = storeById.get(row.storeId);
+                    return (
+                      <tr key={row.storeId} className="border-b">
+                        <td className="py-2 pr-4">
+                          <Link
+                            href={`/review?status=ALL&store=${row.storeId}&month=${monthParam(monthStart)}`}
+                            className="text-blue-600 underline"
+                          >
+                            {store?.name ?? row.storeId}
+                          </Link>
+                          {store?.address && (
+                            <div className="text-xs text-gray-500">{store.address}</div>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums">{row.qtyDelivered}</td>
+                        <td className="py-2 pr-4 tabular-nums">{row.qtySold}</td>
+                        <td className="py-2 pr-4 tabular-nums">{row.qtyUnsold}</td>
+                        <td className="py-2 pr-4 tabular-nums">{formatPercent(row.percentSold)}</td>
+                        <td className="py-2 pr-4 tabular-nums">{formatCents(row.revenueCents)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
@@ -339,35 +343,37 @@ export default async function DashboardPage(props: {
           {topProductsRaw.length === 0 ? (
             <p className="text-sm text-gray-500">No data yet.</p>
           ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Product</th>
-                  <th className="py-2 pr-4">Delivered</th>
-                  <th className="py-2 pr-4">Sold</th>
-                  <th className="py-2 pr-4">Unsold</th>
-                  <th className="py-2 pr-4">% sold</th>
-                  <th className="py-2 pr-4">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProductsRaw.map((row) => {
-                  const product = row.productId ? productById.get(row.productId) : undefined;
-                  return (
-                    <tr key={row.productId} className="border-b">
-                      <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
-                      <td className="py-2 pr-4 tabular-nums">{row._sum.deliveredQuantity ?? 0}</td>
-                      <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
-                      <td className="py-2 pr-4 tabular-nums">{row.qtyUnsold}</td>
-                      <td className="py-2 pr-4 tabular-nums">{formatPercent(row.percentSold)}</td>
-                      <td className="py-2 pr-4 tabular-nums">
-                        {formatCents(row._sum.netSoldAmountCents ?? 0)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-2 pr-4">Product</th>
+                    <th className="py-2 pr-4">Delivered</th>
+                    <th className="py-2 pr-4">Sold</th>
+                    <th className="py-2 pr-4">Unsold</th>
+                    <th className="py-2 pr-4">% sold</th>
+                    <th className="py-2 pr-4">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topProductsRaw.map((row) => {
+                    const product = row.productId ? productById.get(row.productId) : undefined;
+                    return (
+                      <tr key={row.productId} className="border-b">
+                        <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
+                        <td className="py-2 pr-4 tabular-nums">{row._sum.deliveredQuantity ?? 0}</td>
+                        <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
+                        <td className="py-2 pr-4 tabular-nums">{row.qtyUnsold}</td>
+                        <td className="py-2 pr-4 tabular-nums">{formatPercent(row.percentSold)}</td>
+                        <td className="py-2 pr-4 tabular-nums">
+                          {formatCents(row._sum.netSoldAmountCents ?? 0)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>

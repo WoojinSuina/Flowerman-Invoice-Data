@@ -152,52 +152,54 @@ export default async function ReconciliationPage(props: {
         {filtered.length === 0 ? (
           <p className="text-sm text-gray-500">No invoices match these filters.</p>
         ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-4">Invoice #</th>
-                <th className="py-2 pr-4">Store</th>
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Written</th>
-                <th className="py-2 pr-4">Calculated</th>
-                <th className="py-2 pr-4">Impact</th>
-                <th className="py-2 pr-4">Classification</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageItems.map((inv: MismatchedInvoice) => (
-                <tr key={inv.id} className="border-b hover:bg-gray-50">
-                  <td className="py-2 pr-4">
-                    <Link href={`/review/${inv.id}`} className="text-blue-600 underline">
-                      {inv.invoiceNumber}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4">
-                    {inv.storeName}
-                    {inv.storeAddress && <div className="text-xs text-gray-500">{inv.storeAddress}</div>}
-                  </td>
-                  <td className="py-2 pr-4">{formatInvoiceDate(inv.invoiceDate)}</td>
-                  <td className="py-2 pr-4">
-                    <StatusBadge status={inv.validationStatus} />
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">{formatCents(inv.writtenCents)}</td>
-                  <td className="py-2 pr-4 tabular-nums">{formatCents(inv.calculatedCents)}</td>
-                  <td
-                    className={`py-2 pr-4 tabular-nums font-medium ${
-                      inv.impactCents < 0 ? "text-red-700" : "text-green-700"
-                    }`}
-                  >
-                    {inv.impactCents >= 0 ? "+" : ""}
-                    {formatCents(inv.impactCents)}
-                  </td>
-                  <td className="py-2 pr-4">
-                    <ClassificationBadge classification={inv.classification} />
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="py-2 pr-4">Invoice #</th>
+                  <th className="py-2 pr-4">Store</th>
+                  <th className="py-2 pr-4">Date</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Written</th>
+                  <th className="py-2 pr-4">Calculated</th>
+                  <th className="py-2 pr-4">Impact</th>
+                  <th className="py-2 pr-4">Classification</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pageItems.map((inv: MismatchedInvoice) => (
+                  <tr key={inv.id} className="border-b hover:bg-gray-50">
+                    <td className="py-2 pr-4">
+                      <Link href={`/review/${inv.id}`} className="text-blue-600 underline">
+                        {inv.invoiceNumber}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-4">
+                      {inv.storeName}
+                      {inv.storeAddress && <div className="text-xs text-gray-500">{inv.storeAddress}</div>}
+                    </td>
+                    <td className="py-2 pr-4">{formatInvoiceDate(inv.invoiceDate)}</td>
+                    <td className="py-2 pr-4">
+                      <StatusBadge status={inv.validationStatus} />
+                    </td>
+                    <td className="py-2 pr-4 tabular-nums">{formatCents(inv.writtenCents)}</td>
+                    <td className="py-2 pr-4 tabular-nums">{formatCents(inv.calculatedCents)}</td>
+                    <td
+                      className={`py-2 pr-4 tabular-nums font-medium ${
+                        inv.impactCents < 0 ? "text-red-700" : "text-green-700"
+                      }`}
+                    >
+                      {inv.impactCents >= 0 ? "+" : ""}
+                      {formatCents(inv.impactCents)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <ClassificationBadge classification={inv.classification} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {filtered.length > 0 && (
           <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
@@ -237,36 +239,38 @@ export default async function ReconciliationPage(props: {
         {worstStores.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet.</p>
         ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-4">Store</th>
-                <th className="py-2 pr-4">Invoices</th>
-                <th className="py-2 pr-4">Net</th>
-              </tr>
-            </thead>
-            <tbody>
-              {worstStores.map((row) => (
-                <tr key={row.storeId} className="border-b">
-                  <td className="py-2 pr-4">
-                    <Link href={`/stores/${row.storeId}`} className="text-blue-600 underline">
-                      {row.name}
-                    </Link>
-                    {row.address && <div className="text-xs text-gray-500">{row.address}</div>}
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">{row.count}</td>
-                  <td
-                    className={`py-2 pr-4 tabular-nums font-medium ${
-                      row.netCents < 0 ? "text-red-700" : "text-green-700"
-                    }`}
-                  >
-                    {row.netCents >= 0 ? "+" : ""}
-                    {formatCents(row.netCents)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="py-2 pr-4">Store</th>
+                  <th className="py-2 pr-4">Invoices</th>
+                  <th className="py-2 pr-4">Net</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {worstStores.map((row) => (
+                  <tr key={row.storeId} className="border-b">
+                    <td className="py-2 pr-4">
+                      <Link href={`/stores/${row.storeId}`} className="text-blue-600 underline">
+                        {row.name}
+                      </Link>
+                      {row.address && <div className="text-xs text-gray-500">{row.address}</div>}
+                    </td>
+                    <td className="py-2 pr-4 tabular-nums">{row.count}</td>
+                    <td
+                      className={`py-2 pr-4 tabular-nums font-medium ${
+                        row.netCents < 0 ? "text-red-700" : "text-green-700"
+                      }`}
+                    >
+                      {row.netCents >= 0 ? "+" : ""}
+                      {formatCents(row.netCents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </main>

@@ -127,74 +127,76 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
             <T k="noInvoicesProduced" elderly={elderly} />
           </p>
         ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">
-                <T k="page" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="invoiceNumber" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="date" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="store" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="status" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="totalDue" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="difference" elderly={elderly} />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {job.invoices.map((invoice) => {
-              const hasDifference = invoice.validationDifferenceCents !== 0;
-              return (
-                <tr
-                  key={invoice.id}
-                  className={
-                    hasDifference ? "border-b bg-red-50 hover:bg-red-100" : "border-b hover:bg-gray-50"
-                  }
-                >
-                  <td className="py-2 pr-4">{invoice.sourcePage}</td>
-                  <td className="py-2 pr-4">
-                    <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
-                      {invoice.invoiceNumber}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4">{formatInvoiceDate(invoice.invoiceDate)}</td>
-                  <td className="py-2 pr-4">{invoice.store.name}</td>
-                  <td className="py-2 pr-4">
-                    <StatusBadge status={invoice.validationStatus} />
-                  </td>
-                  <td className="py-2 pr-4 font-medium">{formatCents(invoice.totalAmountDueCents)}</td>
-                  <td className={hasDifference ? "py-2 pr-4 font-semibold text-red-700" : "py-2 pr-4"}>
-                    {formatCents(invoice.validationDifferenceCents)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 font-medium">
-              <td className="py-2 pr-4" colSpan={5}>
-                <T k="grandTotal" elderly={elderly} /> ({job.invoices.length}{" "}
-                {elderly ? <T k="invoice" elderly={elderly} /> : `invoice${job.invoices.length === 1 ? "" : "s"}`})
-              </td>
-              <td className="py-2 pr-4">{formatCents(grandTotalCents)}</td>
-              <td className={grandDifferenceCents !== 0 ? "py-2 pr-4 text-red-700" : "py-2 pr-4"}>
-                {formatCents(grandDifferenceCents)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">
+                  <T k="page" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="invoiceNumber" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="date" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="store" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="status" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="totalDue" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="difference" elderly={elderly} />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {job.invoices.map((invoice) => {
+                const hasDifference = invoice.validationDifferenceCents !== 0;
+                return (
+                  <tr
+                    key={invoice.id}
+                    className={
+                      hasDifference ? "border-b bg-red-50 hover:bg-red-100" : "border-b hover:bg-gray-50"
+                    }
+                  >
+                    <td className="py-2 pr-4">{invoice.sourcePage}</td>
+                    <td className="py-2 pr-4">
+                      <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
+                        {invoice.invoiceNumber}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-4">{formatInvoiceDate(invoice.invoiceDate)}</td>
+                    <td className="py-2 pr-4">{invoice.store.name}</td>
+                    <td className="py-2 pr-4">
+                      <StatusBadge status={invoice.validationStatus} />
+                    </td>
+                    <td className="py-2 pr-4 font-medium">{formatCents(invoice.totalAmountDueCents)}</td>
+                    <td className={hasDifference ? "py-2 pr-4 font-semibold text-red-700" : "py-2 pr-4"}>
+                      {formatCents(invoice.validationDifferenceCents)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 font-medium">
+                <td className="py-2 pr-4" colSpan={5}>
+                  <T k="grandTotal" elderly={elderly} /> ({job.invoices.length}{" "}
+                  {elderly ? <T k="invoice" elderly={elderly} /> : `invoice${job.invoices.length === 1 ? "" : "s"}`})
+                </td>
+                <td className="py-2 pr-4">{formatCents(grandTotalCents)}</td>
+                <td className={grandDifferenceCents !== 0 ? "py-2 pr-4 text-red-700" : "py-2 pr-4"}>
+                  {formatCents(grandDifferenceCents)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
         )}
       </section>
 
@@ -203,51 +205,53 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
           <h2 className="mb-4 text-lg font-semibold text-gray-900">
             <T k="failedPages" elderly={elderly} />
           </h2>
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-4">
-                  <T k="page" elderly={elderly} />
-                </th>
-                <th className="py-2 pr-4">
-                  <T k="scannedImage" elderly={elderly} />
-                </th>
-                <th className="py-2 pr-4">
-                  <T k="error" elderly={elderly} />
-                </th>
-                <th className="py-2 pr-4">
-                  <T k="action" elderly={elderly} />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {job.extractionAttempts.map((attempt) => (
-                <tr key={attempt.id} className="border-b">
-                  <td className="py-2 pr-4">{attempt.sourcePage}</td>
-                  <td className="py-2 pr-4">
-                    <FailedPageImage
-                      url={attempt.sourceImageUrl}
-                      page={attempt.sourcePage}
-                      existing={
-                        attempt.duplicateOfInvoiceId
-                          ? (duplicateOfById.get(attempt.duplicateOfInvoiceId) ?? null)
-                          : null
-                      }
-                    />
-                  </td>
-                  <td className="py-2 pr-4 text-red-700">{attempt.errorMessage}</td>
-                  <td className="py-2 pr-4">
-                    {attempt.sourceImageUrl && (
-                      <RetryFailedPageButton
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="py-2 pr-4">
+                    <T k="page" elderly={elderly} />
+                  </th>
+                  <th className="py-2 pr-4">
+                    <T k="scannedImage" elderly={elderly} />
+                  </th>
+                  <th className="py-2 pr-4">
+                    <T k="error" elderly={elderly} />
+                  </th>
+                  <th className="py-2 pr-4">
+                    <T k="action" elderly={elderly} />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {job.extractionAttempts.map((attempt) => (
+                  <tr key={attempt.id} className="border-b">
+                    <td className="py-2 pr-4">{attempt.sourcePage}</td>
+                    <td className="py-2 pr-4">
+                      <FailedPageImage
                         url={attempt.sourceImageUrl}
                         page={attempt.sourcePage}
+                        existing={
+                          attempt.duplicateOfInvoiceId
+                            ? (duplicateOfById.get(attempt.duplicateOfInvoiceId) ?? null)
+                            : null
+                        }
                       />
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="py-2 pr-4 text-red-700">{attempt.errorMessage}</td>
+                    <td className="py-2 pr-4">
+                      {attempt.sourceImageUrl && (
+                        <RetryFailedPageButton
+                          url={attempt.sourceImageUrl}
+                          page={attempt.sourcePage}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </main>
