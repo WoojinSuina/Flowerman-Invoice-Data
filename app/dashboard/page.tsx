@@ -39,10 +39,10 @@ function StatTile({
   sub?: string;
 }) {
   const content = (
-    <div className="h-full rounded-lg border bg-white p-4 shadow-sm">
-      <p className="text-sm font-medium text-gray-600">{label}</p>
-      <p className="text-2xl font-semibold text-gray-900">{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
+    <div className="h-full min-w-0 rounded-lg border bg-white p-4 shadow-sm">
+      <p className="truncate text-sm font-medium text-gray-600">{label}</p>
+      <p className="truncate text-lg font-semibold text-gray-900 sm:text-2xl">{value}</p>
+      {sub && <p className="mt-1 truncate text-xs text-gray-500">{sub}</p>}
     </div>
   );
   return href ? (
