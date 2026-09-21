@@ -90,6 +90,10 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
   const duplicateOfById = new Map(duplicateOfInvoices.map((inv) => [inv.id, inv]));
 
   const grandTotalCents = job.invoices.reduce((sum, inv) => sum + inv.totalAmountDueCents, 0);
+  const grandDifferenceCents = job.invoices.reduce(
+    (sum, inv) => sum + inv.validationDifferenceCents,
+    0
+  );
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -158,7 +162,9 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                 Grand total ({job.invoices.length} invoice{job.invoices.length === 1 ? "" : "s"})
               </td>
               <td className="py-2 pr-4">{formatCents(grandTotalCents)}</td>
-              <td className="py-2 pr-4"></td>
+              <td className={grandDifferenceCents !== 0 ? "py-2 pr-4 text-red-700" : "py-2 pr-4"}>
+                {formatCents(grandDifferenceCents)}
+              </td>
             </tr>
           </tfoot>
         </table>
