@@ -224,7 +224,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `Approve failed (${res.status})`);
       }
-      router.push("/review");
+      router.back();
     } catch (err) {
       setError((err as Error).message);
       setApproving(false);
