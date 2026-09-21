@@ -122,22 +122,32 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
             </tr>
           </thead>
           <tbody>
-            {job.invoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                <td className="py-2 pr-4">{invoice.sourcePage}</td>
-                <td className="py-2 pr-4">
-                  <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
-                    {invoice.invoiceNumber}
-                  </Link>
-                </td>
-                <td className="py-2 pr-4">{invoice.store.name}</td>
-                <td className="py-2 pr-4">
-                  <StatusBadge status={invoice.validationStatus} />
-                </td>
-                <td className="py-2 pr-4 font-medium">{formatCents(invoice.totalAmountDueCents)}</td>
-                <td className="py-2 pr-4">{formatCents(invoice.validationDifferenceCents)}</td>
-              </tr>
-            ))}
+            {job.invoices.map((invoice) => {
+              const hasDifference = invoice.validationDifferenceCents !== 0;
+              return (
+                <tr
+                  key={invoice.id}
+                  className={
+                    hasDifference ? "border-b bg-red-50 hover:bg-red-100" : "border-b hover:bg-gray-50"
+                  }
+                >
+                  <td className="py-2 pr-4">{invoice.sourcePage}</td>
+                  <td className="py-2 pr-4">
+                    <Link href={`/review/${invoice.id}`} className="text-blue-600 underline">
+                      {invoice.invoiceNumber}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-4">{invoice.store.name}</td>
+                  <td className="py-2 pr-4">
+                    <StatusBadge status={invoice.validationStatus} />
+                  </td>
+                  <td className="py-2 pr-4 font-medium">{formatCents(invoice.totalAmountDueCents)}</td>
+                  <td className={hasDifference ? "py-2 pr-4 font-semibold text-red-700" : "py-2 pr-4"}>
+                    {formatCents(invoice.validationDifferenceCents)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t-2 font-medium">
