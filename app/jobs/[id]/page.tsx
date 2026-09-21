@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
 import { RetryFailedPageButton } from "@/components/jobs/RetryFailedPageButton";
 import { QueueKeepAlive } from "@/components/jobs/QueueKeepAlive";
+import { NavBar } from "@/components/NavBar";
 import { T } from "@/components/T";
 import { isElderlyMode } from "@/lib/elderlyMode";
 
@@ -103,9 +104,10 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
   return (
     <main className="mx-auto max-w-5xl p-6">
       <QueueKeepAlive active={job.status === "PROCESSING"} />
-      <div className="mb-4 flex items-center justify-between">
+      <NavBar />
+      <div className="mb-6 flex items-center justify-between rounded-lg border bg-white p-5 shadow-sm">
         <div>
-          <h1 className="text-xl font-semibold">{job.filename}</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{job.filename}</h1>
           <p className="text-sm text-gray-500">
             <StatusBadge status={job.status} /> · {job.processedPages}/{job.totalPages}{" "}
             <T k="pagesProcessed" elderly={elderly} />
@@ -116,15 +118,16 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
         </Link>
       </div>
 
-      <h2 className="mb-2 mt-6 font-medium">
-        <T k="invoicesProduced" elderly={elderly} />
-      </h2>
-      {job.invoices.length === 0 ? (
-        <p className="text-gray-500">
-          <T k="noInvoicesProduced" elderly={elderly} />
-        </p>
-      ) : (
-        <table className="mb-6 w-full border-collapse text-sm">
+      <section className="rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <T k="invoicesProduced" elderly={elderly} />
+        </h2>
+        {job.invoices.length === 0 ? (
+          <p className="text-gray-500">
+            <T k="noInvoicesProduced" elderly={elderly} />
+          </p>
+        ) : (
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
               <th className="py-2 pr-4">
@@ -192,11 +195,12 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
             </tr>
           </tfoot>
         </table>
-      )}
+        )}
+      </section>
 
       {job.extractionAttempts.length > 0 && (
-        <>
-          <h2 className="mb-2 mt-6 font-medium">
+        <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
             <T k="failedPages" elderly={elderly} />
           </h2>
           <table className="w-full border-collapse text-sm">
@@ -244,7 +248,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
               ))}
             </tbody>
           </table>
-        </>
+        </section>
       )}
     </main>
   );

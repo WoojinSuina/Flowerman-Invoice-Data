@@ -27,68 +27,72 @@ export default async function JobsListPage() {
       <h1 className="mb-4 text-2xl font-semibold">
         <T k="uploadAndJobs" elderly={elderly} />
       </h1>
-      {!elderly && (
-        <p className="mb-6 text-sm text-gray-500">
-          Select one or more invoice images or multi-page PDFs (one invoice per page)
-          — each is split and processed automatically. Files upload one at a time;
-          add as many as you like and they&apos;ll queue up.
-        </p>
-      )}
 
-      <UploadForm />
+      <section className="rounded-lg border bg-white p-5 shadow-sm">
+        {!elderly && (
+          <p className="mb-4 text-sm text-gray-500">
+            Select one or more invoice images or multi-page PDFs (one invoice per page)
+            — each is split and processed automatically. Files upload one at a time;
+            add as many as you like and they&apos;ll queue up.
+          </p>
+        )}
+        <UploadForm />
+      </section>
 
-      <h2 className="mb-4 mt-8 text-lg font-medium">
-        <T k="batchJobs" elderly={elderly} />
-      </h2>
+      <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <T k="batchJobs" elderly={elderly} />
+        </h2>
 
-      {jobs.length === 0 ? (
-        <p className="text-gray-500">
-          <T k="noUploadsYet" elderly={elderly} />
-        </p>
-      ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">
-                <T k="file" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="uploaded" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="status" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="progress" elderly={elderly} />
-              </th>
-              <th className="py-2 pr-4">
-                <T k="passReviewFailed" elderly={elderly} />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => (
-              <tr key={job.id} className="border-b hover:bg-gray-50">
-                <td className="py-2 pr-4">
-                  <Link href={`/jobs/${job.id}`} className="text-blue-600 underline">
-                    {job.filename}
-                  </Link>
-                </td>
-                <td className="py-2 pr-4">{new Date(job.createdAt).toLocaleString()}</td>
-                <td className="py-2 pr-4">
-                  <StatusBadge status={job.status} />
-                </td>
-                <td className="py-2 pr-4">
-                  {job.processedPages} / {job.totalPages}
-                </td>
-                <td className="py-2 pr-4">
-                  {job.passedPages} / {job.reviewPages} / {job.failedPages}
-                </td>
+        {jobs.length === 0 ? (
+          <p className="text-gray-500">
+            <T k="noUploadsYet" elderly={elderly} />
+          </p>
+        ) : (
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">
+                  <T k="file" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="uploaded" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="status" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="progress" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="passReviewFailed" elderly={elderly} />
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {jobs.map((job) => (
+                <tr key={job.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 pr-4">
+                    <Link href={`/jobs/${job.id}`} className="text-blue-600 underline">
+                      {job.filename}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-4">{new Date(job.createdAt).toLocaleString()}</td>
+                  <td className="py-2 pr-4">
+                    <StatusBadge status={job.status} />
+                  </td>
+                  <td className="py-2 pr-4">
+                    {job.processedPages} / {job.totalPages}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {job.passedPages} / {job.reviewPages} / {job.failedPages}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
     </main>
   );
 }
