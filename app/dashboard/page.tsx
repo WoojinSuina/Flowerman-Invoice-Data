@@ -41,7 +41,7 @@ function StatTile({
   const content = (
     <div className="h-full rounded-lg border bg-white p-4 shadow-sm">
       <p className="text-sm font-medium text-gray-600">{label}</p>
-      <p className="text-3xl font-semibold text-gray-900">{value}</p>
+      <p className="text-2xl font-semibold text-gray-900">{value}</p>
       {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
     </div>
   );

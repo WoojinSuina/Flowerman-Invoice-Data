@@ -251,7 +251,7 @@ export default async function RecommendationsPage(props: {
         <p className="text-sm text-gray-500">No data yet.</p>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[16rem_1fr]">
-          <nav className="md:h-[calc(100vh-14rem)] md:overflow-auto md:border-r md:pr-4">
+          <nav className="order-2 md:order-none md:h-[calc(100vh-14rem)] md:overflow-auto md:border-r md:pr-4">
             <ul className="space-y-1">
               {storeRecommendations.map((store) => (
                 <li key={store.storeId}>
@@ -289,7 +289,7 @@ export default async function RecommendationsPage(props: {
           </nav>
 
           {selectedStore && (
-            <div>
+            <div className="order-1 md:order-none">
               <div className="mb-2 flex items-center justify-between">
                 <h2 className="font-medium">
                   {selectedStore.storeName}
@@ -318,34 +318,36 @@ export default async function RecommendationsPage(props: {
                 </p>
               ) : (
                 <>
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-gray-500">
-                        <th className="py-2 pr-4">Product</th>
-                        <th className="py-2 pr-4">Suggested qty</th>
-                        <th className="py-2 pr-4">Avg delivered</th>
-                        <th className="py-2 pr-4">Avg returned</th>
-                        <th className="py-2 pr-4">Based on</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedStore.products.map((p) => (
-                        <tr key={p.productId} className="border-b">
-                          <td className="py-2 pr-4">{p.productName}</td>
-                          <td className="py-2 pr-4 tabular-nums font-semibold">
-                            {p.recommendedQty}
-                          </td>
-                          <td className="py-2 pr-4 tabular-nums text-gray-500">
-                            {p.avgDelivered.toFixed(1)}
-                          </td>
-                          <td className="py-2 pr-4 tabular-nums text-gray-500">
-                            {p.avgReturned.toFixed(1)}
-                          </td>
-                          <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-gray-500">
+                          <th className="py-2 pr-4">Product</th>
+                          <th className="py-2 pr-4">Suggested qty</th>
+                          <th className="py-2 pr-4">Avg delivered</th>
+                          <th className="py-2 pr-4">Avg returned</th>
+                          <th className="py-2 pr-4">Based on</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {selectedStore.products.map((p) => (
+                          <tr key={p.productId} className="border-b">
+                            <td className="py-2 pr-4">{p.productName}</td>
+                            <td className="py-2 pr-4 tabular-nums font-semibold">
+                              {p.recommendedQty}
+                            </td>
+                            <td className="py-2 pr-4 tabular-nums text-gray-500">
+                              {p.avgDelivered.toFixed(1)}
+                            </td>
+                            <td className="py-2 pr-4 tabular-nums text-gray-500">
+                              {p.avgReturned.toFixed(1)}
+                            </td>
+                            <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
                   <h2 className="mb-2 mt-8 font-medium">
                     Recent invoices: delivered vs sold
