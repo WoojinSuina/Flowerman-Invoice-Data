@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
 import { RetryFailedPageButton } from "@/components/jobs/RetryFailedPageButton";
 import { QueueKeepAlive } from "@/components/jobs/QueueKeepAlive";
+import { T } from "@/components/T";
+import { isElderlyMode } from "@/lib/elderlyMode";
 
 function ScannedImage({ url, alt }: { url: string; alt: string }) {
   return url.endsWith(".pdf") ? (
@@ -61,16 +63,19 @@ function FailedPageImage({
 
 export default async function JobDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const job = await prisma.processingJob.findUnique({
-    where: { id: params.id },
-    include: {
-      // Most recently changed first, so approving/correcting an invoice
-      // from this job brings it back to the top instead of leaving it
-      // buried in original page order.
-      invoices: { include: { store: true }, orderBy: { updatedAt: "desc" } },
-      extractionAttempts: { where: { succeeded: false }, orderBy: { sourcePage: "asc" } },
-    },
-  });
+  const [job, elderly] = await Promise.all([
+    prisma.processingJob.findUnique({
+      where: { id: params.id },
+      include: {
+        // Most recently changed first, so approving/correcting an invoice
+        // from this job brings it back to the top instead of leaving it
+        // buried in original page order.
+        invoices: { include: { store: true }, orderBy: { updatedAt: "desc" } },
+        extractionAttempts: { where: { succeeded: false }, orderBy: { sourcePage: "asc" } },
+      },
+    }),
+    isElderlyMode(),
+  ]);
 
   if (!job) {
     notFound();
@@ -102,29 +107,47 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
         <div>
           <h1 className="text-xl font-semibold">{job.filename}</h1>
           <p className="text-sm text-gray-500">
-            <StatusBadge status={job.status} /> · {job.processedPages}/{job.totalPages} pages
-            processed
+            <StatusBadge status={job.status} /> · {job.processedPages}/{job.totalPages}{" "}
+            <T k="pagesProcessed" elderly={elderly} />
           </p>
         </div>
         <Link href="/jobs" className="text-sm text-blue-600 underline">
-          Back to jobs
+          <T k="backToJobs" elderly={elderly} />
         </Link>
       </div>
 
-      <h2 className="mb-2 mt-6 font-medium">Invoices produced</h2>
+      <h2 className="mb-2 mt-6 font-medium">
+        <T k="invoicesProduced" elderly={elderly} />
+      </h2>
       {job.invoices.length === 0 ? (
-        <p className="text-gray-500">No invoices produced.</p>
+        <p className="text-gray-500">
+          <T k="noInvoicesProduced" elderly={elderly} />
+        </p>
       ) : (
         <table className="mb-6 w-full border-collapse text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">Page</th>
-              <th className="py-2 pr-4">Invoice #</th>
-              <th className="py-2 pr-4">Date</th>
-              <th className="py-2 pr-4">Store</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Total Due</th>
-              <th className="py-2 pr-4">Difference</th>
+              <th className="py-2 pr-4">
+                <T k="page" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="invoiceNumber" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="date" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="store" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="status" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="totalDue" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="difference" elderly={elderly} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -159,7 +182,8 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
           <tfoot>
             <tr className="border-t-2 font-medium">
               <td className="py-2 pr-4" colSpan={5}>
-                Grand total ({job.invoices.length} invoice{job.invoices.length === 1 ? "" : "s"})
+                <T k="grandTotal" elderly={elderly} /> ({job.invoices.length}{" "}
+                {elderly ? <T k="invoice" elderly={elderly} /> : `invoice${job.invoices.length === 1 ? "" : "s"}`})
               </td>
               <td className="py-2 pr-4">{formatCents(grandTotalCents)}</td>
               <td className={grandDifferenceCents !== 0 ? "py-2 pr-4 text-red-700" : "py-2 pr-4"}>
@@ -172,14 +196,24 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
 
       {job.extractionAttempts.length > 0 && (
         <>
-          <h2 className="mb-2 mt-6 font-medium">Failed pages</h2>
+          <h2 className="mb-2 mt-6 font-medium">
+            <T k="failedPages" elderly={elderly} />
+          </h2>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-4">Page</th>
-                <th className="py-2 pr-4">Scanned image</th>
-                <th className="py-2 pr-4">Error</th>
-                <th className="py-2 pr-4">Action</th>
+                <th className="py-2 pr-4">
+                  <T k="page" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="scannedImage" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="error" elderly={elderly} />
+                </th>
+                <th className="py-2 pr-4">
+                  <T k="action" elderly={elderly} />
+                </th>
               </tr>
             </thead>
             <tbody>

@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Elderly/large-text mode (components/ElderlyModeToggle.tsx). Tailwind's
+   spacing and font-size scales are rem-based, so bumping the root
+   font-size scales nearly everything in the app proportionally — text,
+   padding, gaps, icons — without needing to touch every component. */
+html.elderly {
+  font-size: 22px;
+}
+
+html.elderly a,
+html.elderly button {
+  text-underline-offset: 3px;
+}
+
+/* Larger tap targets and clearer boundaries for buttons/links people
+   click directly, on top of the blanket font-size scale above. */
+html.elderly button,
+html.elderly input[type="submit"] {
+  min-height: 2.75rem;
+}

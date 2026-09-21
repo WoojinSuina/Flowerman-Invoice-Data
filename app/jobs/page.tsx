@@ -4,43 +4,66 @@ import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
 import { UploadForm } from "@/components/UploadForm";
 import { QueueKeepAlive } from "@/components/jobs/QueueKeepAlive";
+import { T } from "@/components/T";
+import { isElderlyMode } from "@/lib/elderlyMode";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
 export const dynamic = "force-dynamic";
 
 export default async function JobsListPage() {
-  const jobs = await prisma.processingJob.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { invoices: true } } },
-  });
+  const [jobs, elderly] = await Promise.all([
+    prisma.processingJob.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { invoices: true } } },
+    }),
+    isElderlyMode(),
+  ]);
 
   return (
     <main className="mx-auto max-w-5xl p-6">
       <QueueKeepAlive active={jobs.some((job) => job.status === "PROCESSING")} />
       <NavBar />
-      <h1 className="mb-4 text-2xl font-semibold">Upload &amp; Jobs</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Select one or more invoice images or multi-page PDFs (one invoice per page)
-        — each is split and processed automatically. Files upload one at a time;
-        add as many as you like and they&apos;ll queue up.
-      </p>
+      <h1 className="mb-4 text-2xl font-semibold">
+        <T k="uploadAndJobs" elderly={elderly} />
+      </h1>
+      {!elderly && (
+        <p className="mb-6 text-sm text-gray-500">
+          Select one or more invoice images or multi-page PDFs (one invoice per page)
+          — each is split and processed automatically. Files upload one at a time;
+          add as many as you like and they&apos;ll queue up.
+        </p>
+      )}
 
       <UploadForm />
 
-      <h2 className="mb-4 mt-8 text-lg font-medium">Batch jobs</h2>
+      <h2 className="mb-4 mt-8 text-lg font-medium">
+        <T k="batchJobs" elderly={elderly} />
+      </h2>
 
       {jobs.length === 0 ? (
-        <p className="text-gray-500">No uploads yet.</p>
+        <p className="text-gray-500">
+          <T k="noUploadsYet" elderly={elderly} />
+        </p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
-              <th className="py-2 pr-4">File</th>
-              <th className="py-2 pr-4">Uploaded</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Progress</th>
-              <th className="py-2 pr-4">Pass / Review / Failed</th>
+              <th className="py-2 pr-4">
+                <T k="file" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="uploaded" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="status" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="progress" elderly={elderly} />
+              </th>
+              <th className="py-2 pr-4">
+                <T k="passReviewFailed" elderly={elderly} />
+              </th>
             </tr>
           </thead>
           <tbody>
