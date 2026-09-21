@@ -5,6 +5,7 @@ import { formatCents } from "@/lib/money";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
 import { RetryFailedPageButton } from "@/components/jobs/RetryFailedPageButton";
+import { QueueKeepAlive } from "@/components/jobs/QueueKeepAlive";
 
 function ScannedImage({ url, alt }: { url: string; alt: string }) {
   return url.endsWith(".pdf") ? (
@@ -91,6 +92,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
 
   return (
     <main className="mx-auto max-w-5xl p-6">
+      <QueueKeepAlive active={job.status === "PROCESSING"} />
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">{job.filename}</h1>

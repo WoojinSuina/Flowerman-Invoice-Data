@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/client";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { NavBar } from "@/components/NavBar";
 import { UploadForm } from "@/components/UploadForm";
+import { QueueKeepAlive } from "@/components/jobs/QueueKeepAlive";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -16,6 +17,7 @@ export default async function JobsListPage() {
 
   return (
     <main className="mx-auto max-w-5xl p-6">
+      <QueueKeepAlive active={jobs.some((job) => job.status === "PROCESSING")} />
       <NavBar />
       <h1 className="mb-4 text-2xl font-semibold">Upload &amp; Jobs</h1>
       <p className="mb-6 text-sm text-gray-500">
