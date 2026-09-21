@@ -4,6 +4,7 @@ import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MonthSelect } from "@/components/dashboard/MonthSelect";
 import { StoreListModal } from "@/components/dashboard/StoreListModal";
+import { MonthlyBarChart, type MonthlyBarDatum } from "@/components/dashboard/MonthlyBarChart";
 import { getMismatchedInvoices, summarizeMismatches } from "@/lib/reconciliation";
 import {
   parseMonthParam,
@@ -76,14 +77,42 @@ export default async function DashboardPage(props: {
       label: formatMonthLabel(parseMonthParam(value)),
     }));
 
-  const [totalInvoices, revenue, potentialRevenue, reviewCount, mismatches] = await Promise.all([
-    prisma.invoice.count({ where: thisMonth }),
-    prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
-    prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
-    prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
-    getMismatchedInvoices(),
-  ]);
+  const year = monthStart.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const nextYearStart = new Date(Date.UTC(year + 1, 0, 1));
+
+  const [totalInvoices, revenue, potentialRevenue, reviewCount, mismatches, monthlyRaw] =
+    await Promise.all([
+      prisma.invoice.count({ where: thisMonth }),
+      prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
+      prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
+      prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
+      getMismatchedInvoices(),
+      prisma.$queryRaw<{ month: string; revenue_cents: number; invoice_count: number }[]>`
+      SELECT to_char(invoice_date, 'YYYY-MM') AS month,
+             SUM(calculated_amount_due_cents)::int AS revenue_cents,
+             COUNT(*)::int AS invoice_count
+      FROM invoices
+      WHERE invoice_date >= ${yearStart} AND invoice_date < ${nextYearStart}
+      GROUP BY month
+    `,
+    ]);
   const reconciliationSummary = summarizeMismatches(mismatches);
+
+  // Always all 12 months of the selected year, even ones with no invoices
+  // yet, so the shape of the year is visible rather than just the months
+  // with data so far.
+  const monthlyByKey = new Map(monthlyRaw.map((r) => [r.month, r]));
+  const monthlyRevenue: MonthlyBarDatum[] = [];
+  const monthlyVolume: MonthlyBarDatum[] = [];
+  for (let m = 0; m < 12; m++) {
+    const monthDate = new Date(Date.UTC(year, m, 1));
+    const monthValue = monthParam(monthDate);
+    const label = monthDate.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+    const row = monthlyByKey.get(monthValue);
+    monthlyRevenue.push({ label, monthValue, value: row?.revenue_cents ?? 0 });
+    monthlyVolume.push({ label, monthValue, value: row?.invoice_count ?? 0 });
+  }
 
   const monthInvoicesForStores = await prisma.invoice.findMany({
     where: thisMonth,
@@ -296,6 +325,21 @@ export default async function DashboardPage(props: {
               </tbody>
             </table>
           )}
+        </div>
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div>
+          <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
+          <MonthlyBarChart data={monthlyRevenue} formatValue={formatCents} color="#2563eb" />
+        </div>
+        <div>
+          <h2 className="mb-4 font-medium">Invoices by month ({year})</h2>
+          <MonthlyBarChart
+            data={monthlyVolume}
+            formatValue={(v) => v.toLocaleString()}
+            color="#ea580c"
+          />
         </div>
       </div>
 
