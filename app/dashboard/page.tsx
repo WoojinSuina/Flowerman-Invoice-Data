@@ -39,14 +39,14 @@ function StatTile({
   sub?: string;
 }) {
   const content = (
-    <div className="rounded border p-4">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-3xl font-semibold">{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+    <div className="h-full rounded-lg border bg-white p-4 shadow-sm">
+      <p className="text-sm font-medium text-gray-600">{label}</p>
+      <p className="text-3xl font-semibold text-gray-900">{value}</p>
+      {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
     </div>
   );
   return href ? (
-    <Link href={href} className="block hover:bg-gray-50">
+    <Link href={href} className="block transition-shadow hover:shadow-md">
       {content}
     </Link>
   ) : (
