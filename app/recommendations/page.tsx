@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { NavBar } from "@/components/NavBar";
 import { InvoiceGallery } from "@/components/recommendations/InvoiceGallery";
+import { ProductTrendChart, type TrendPoint } from "@/components/recommendations/ProductTrendChart";
 import { formatInvoiceDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,10 @@ interface ProductRecommendation {
   avgReturned: number;
   basisCount: number;
   basisLabel: string;
+  /** Sold quantity across the store's FULL invoice history for this
+   * product, oldest first — the averaging basis above only uses a
+   * window of it, but the trend chart shows the whole shape. */
+  trend: TrendPoint[];
 }
 
 interface StoreRecommendations {
@@ -129,6 +134,9 @@ export default async function RecommendationsPage(props: {
     }
 
     const avgSold = average(basis, (e) => e.sold);
+    const trend: TrendPoint[] = [...entries]
+      .sort((a, b) => a.invoiceDate.getTime() - b.invoiceDate.getTime())
+      .map((e) => ({ dateLabel: formatInvoiceDate(e.invoiceDate), sold: e.sold }));
     const recommendation: ProductRecommendation = {
       productId,
       productName: product.name,
@@ -137,6 +145,7 @@ export default async function RecommendationsPage(props: {
       avgReturned: average(basis, (e) => e.returned),
       basisCount: basis.length,
       basisLabel,
+      trend,
     };
 
     const existing = byStore.get(storeId);
@@ -288,6 +297,7 @@ export default async function RecommendationsPage(props: {
                       <th className="py-2 pr-4">Avg delivered</th>
                       <th className="py-2 pr-4">Avg returned</th>
                       <th className="py-2 pr-4">Based on</th>
+                      <th className="py-2 pr-4">Sold trend (all invoices)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -304,6 +314,9 @@ export default async function RecommendationsPage(props: {
                           {p.avgReturned.toFixed(1)}
                         </td>
                         <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
+                        <td className="w-40 py-2 pr-4">
+                          <ProductTrendChart points={p.trend} color="#2563eb" />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
