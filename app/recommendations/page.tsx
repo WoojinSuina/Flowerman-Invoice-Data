@@ -2,7 +2,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { NavBar } from "@/components/NavBar";
 import { InvoiceGallery } from "@/components/recommendations/InvoiceGallery";
-import { ProductTrendChart, type TrendPoint } from "@/components/recommendations/ProductTrendChart";
+import {
+  ProductComparisonChart,
+  DELIVERED_COLOR,
+  SOLD_COLOR,
+  type ComparisonPoint,
+} from "@/components/recommendations/ProductTrendChart";
 import { formatInvoiceDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +29,10 @@ interface ProductRecommendation {
   avgReturned: number;
   basisCount: number;
   basisLabel: string;
-  /** Sold quantity across the store's FULL invoice history for this
+  /** Delivered vs. sold across the store's FULL invoice history for this
    * product, oldest first — the averaging basis above only uses a
-   * window of it, but the trend chart shows the whole shape. */
-  trend: TrendPoint[];
+   * window of it, but the comparison chart shows the recent shape. */
+  history: ComparisonPoint[];
 }
 
 interface StoreRecommendations {
@@ -134,9 +139,13 @@ export default async function RecommendationsPage(props: {
     }
 
     const avgSold = average(basis, (e) => e.sold);
-    const trend: TrendPoint[] = [...entries]
+    const history: ComparisonPoint[] = [...entries]
       .sort((a, b) => a.invoiceDate.getTime() - b.invoiceDate.getTime())
-      .map((e) => ({ dateLabel: formatInvoiceDate(e.invoiceDate), sold: e.sold }));
+      .map((e) => ({
+        dateLabel: formatInvoiceDate(e.invoiceDate),
+        delivered: e.delivered,
+        sold: e.sold,
+      }));
     const recommendation: ProductRecommendation = {
       productId,
       productName: product.name,
@@ -145,7 +154,7 @@ export default async function RecommendationsPage(props: {
       avgReturned: average(basis, (e) => e.returned),
       basisCount: basis.length,
       basisLabel,
-      trend,
+      history,
     };
 
     const existing = byStore.get(storeId);
@@ -289,38 +298,60 @@ export default async function RecommendationsPage(props: {
                   review, so there&apos;s nothing to base a recommendation on.
                 </p>
               ) : (
-                <table className="w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-gray-500">
-                      <th className="py-2 pr-4">Product</th>
-                      <th className="py-2 pr-4">Suggested qty</th>
-                      <th className="py-2 pr-4">Avg delivered</th>
-                      <th className="py-2 pr-4">Avg returned</th>
-                      <th className="py-2 pr-4">Based on</th>
-                      <th className="py-2 pr-4">Sold trend (all invoices)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedStore.products.map((p) => (
-                      <tr key={p.productId} className="border-b">
-                        <td className="py-2 pr-4">{p.productName}</td>
-                        <td className="py-2 pr-4 tabular-nums font-semibold">
-                          {p.recommendedQty}
-                        </td>
-                        <td className="py-2 pr-4 tabular-nums text-gray-500">
-                          {p.avgDelivered.toFixed(1)}
-                        </td>
-                        <td className="py-2 pr-4 tabular-nums text-gray-500">
-                          {p.avgReturned.toFixed(1)}
-                        </td>
-                        <td className="py-2 pr-4 tabular-nums text-gray-500">{p.basisLabel}</td>
-                        <td className="w-40 py-2 pr-4">
-                          <ProductTrendChart points={p.trend} color="#2563eb" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <>
+                  <div className="mb-2 flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-sm"
+                        style={{ backgroundColor: DELIVERED_COLOR }}
+                      />
+                      Delivered
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-sm"
+                        style={{ backgroundColor: SOLD_COLOR }}
+                      />
+                      Sold
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-gray-500">
+                          <th className="py-2 pr-4">Product</th>
+                          <th className="py-2 pr-4">Suggested qty</th>
+                          <th className="py-2 pr-4">Avg delivered</th>
+                          <th className="py-2 pr-4">Avg returned</th>
+                          <th className="py-2 pr-4">Based on</th>
+                          <th className="py-2 pr-4">Recent invoices: delivered vs sold</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedStore.products.map((p) => (
+                          <tr key={p.productId} className="border-b">
+                            <td className="py-2 pr-4">{p.productName}</td>
+                            <td className="py-2 pr-4 tabular-nums font-semibold">
+                              {p.recommendedQty}
+                            </td>
+                            <td className="py-2 pr-4 tabular-nums text-gray-500">
+                              {p.avgDelivered.toFixed(1)}
+                            </td>
+                            <td className="py-2 pr-4 tabular-nums text-gray-500">
+                              {p.avgReturned.toFixed(1)}
+                            </td>
+                            <td className="py-2 pr-4 tabular-nums text-gray-500">
+                              {p.basisLabel}
+                            </td>
+                            <td className="py-2 pr-4">
+                              <ProductComparisonChart points={p.history} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
 
               <h2 className="mb-2 mt-8 font-medium">
