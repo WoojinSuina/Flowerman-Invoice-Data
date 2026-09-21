@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
-import { T } from "@/components/T";
+import { NavTabs } from "@/components/NavTabs";
 import { isElderlyMode } from "@/lib/elderlyMode";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -24,17 +23,7 @@ export async function NavBar() {
           : "mb-6 flex items-center justify-between border-b pb-4"
       }
     >
-      <div className={elderly ? "flex flex-wrap gap-6" : "flex gap-4"}>
-        {LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={elderly ? "text-blue-700 underline" : "text-sm text-blue-600 underline"}
-          >
-            <T k={link.key} elderly={elderly} />
-          </Link>
-        ))}
-      </div>
+      <NavTabs links={LINKS} elderly={elderly} />
       <div className="flex items-center gap-3">
         <LogoutButton elderly={elderly} />
       </div>
