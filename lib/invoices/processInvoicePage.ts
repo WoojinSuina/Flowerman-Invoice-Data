@@ -8,6 +8,8 @@ import { dollarsToCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
 import { isConsignmentStore, normalizeStoreIdentity } from "@/lib/stores";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
+import { rotatePageBuffer } from "@/lib/invoices/rotatePage";
+import { uploadInvoiceFile } from "@/lib/storage/supabase";
 
 /**
  * A store's identity is (name, address) together, not the printed store
@@ -105,7 +107,8 @@ export type ProcessPageResult =
  * abort the pages after it.
  */
 export async function processInvoicePage(input: ProcessPageInput): Promise<ProcessPageResult> {
-  const { buffer, mimeType, sourceFileName, sourcePage, processingJobId, sourceImageUrl } = input;
+  const { buffer, mimeType, sourceFileName, sourcePage, processingJobId } = input;
+  let sourceImageUrl = input.sourceImageUrl;
   const extractor = new ClaudeInvoiceExtractor();
 
   let extracted;
@@ -124,6 +127,25 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
       },
     });
     return { ok: false, sourcePage, error: `Extraction failed: ${message}` };
+  }
+
+  // The scanner occasionally feeds a page in upside-down or sideways —
+  // when the model flags that, physically rotate the page and read it
+  // again once on the corrected image. This both gives a more reliable
+  // read than the sideways/upside-down pass and, by re-uploading the
+  // rotated bytes, fixes how the page displays for human review too. A
+  // failure here (rotation or the follow-up read) just falls back to the
+  // original pass rather than failing the whole page over it.
+  if (extracted.rotationDegrees !== 0) {
+    try {
+      const rotatedBuffer = await rotatePageBuffer(buffer, mimeType, extracted.rotationDegrees);
+      const reExtracted = await extractor.extractInvoice(rotatedBuffer, mimeType);
+      const uploaded = await uploadInvoiceFile(rotatedBuffer, mimeType);
+      extracted = reExtracted;
+      sourceImageUrl = uploaded.url;
+    } catch {
+      // Keep the original (possibly rotated) read/image.
+    }
   }
 
   // Preserve exactly what the AI read, forever, before applying the

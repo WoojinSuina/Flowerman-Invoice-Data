@@ -24,6 +24,12 @@ export const ExtractedInvoiceSchema = z.object({
   totalCharges: z.number(),
   totalCredit: z.number(),
   totalAmountDue: z.number(),
+  // Clockwise degrees needed to make the scanned page upright — the
+  // scanner occasionally feeds a page in upside-down or sideways. When
+  // nonzero, the caller physically rotates the page and re-extracts once
+  // on the corrected image, both for a more reliable read and so the
+  // stored image displays right-side up for human review.
+  rotationDegrees: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
 });
 
 export type ExtractedLineItem = z.infer<typeof ExtractedLineItemSchema>;

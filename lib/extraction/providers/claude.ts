@@ -53,11 +53,19 @@ fences, no commentary:
   ],
   "totalCharges": number,
   "totalCredit": number,
-  "totalAmountDue": number
+  "totalAmountDue": number,
+  "rotationDegrees": 0 | 90 | 180 | 270
 }
 
 If a returned-quantity field is blank/illegible, use 0 and set confidence <= 0.3
-for that field rather than guessing a nonzero value.`;
+for that field rather than guessing a nonzero value.
+
+IMPORTANT — page orientation: the scanner occasionally feeds a page in
+upside-down or sideways. Read the page in whatever orientation the text
+actually reads correctly in (do not let a wrong orientation make you
+guess at fields), and separately report how many degrees CLOCKWISE the
+page image itself would need to be rotated to appear upright: 0 if it's
+already upright, 90, 180, or 270 otherwise.`;
 
 export class ClaudeInvoiceExtractor implements InvoiceExtractor {
   readonly providerName = "claude-vision";
