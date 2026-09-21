@@ -20,64 +20,82 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ processed: false, reason: "queue empty" });
   }
 
-  const fileRes = await fetch(claimed.storageUrl);
-  if (!fileRes.ok) {
-    // The file itself is missing/unreachable — record it as a failed page
-    // and drop it from the queue rather than reclaiming it forever.
-    const message = `Could not fetch queued file (${fileRes.status})`;
-    await prisma.extractionAttempt.create({
-      data: {
-        provider: "claude-vision",
-        processingJobId: claimed.processingJobId,
-        sourcePage: claimed.sourcePage,
-        rawResponse: { error: message },
-        succeeded: false,
-        errorMessage: message,
-        sourceImageUrl: claimed.storageUrl,
-      },
+  // Everything below can fail in ways that have nothing to do with this
+  // specific page (a transient DB hiccup, a network blip fetching from
+  // Storage) — confirmed live that an uncaught error here silently killed
+  // the whole chain, since triggerPageProcessing() was never reached,
+  // and nothing else was going to call this route again on its own. The
+  // chain must survive a single bad link: on any failure, still trigger
+  // the next call so the queue keeps moving (claimNextPendingPage's
+  // SKIP LOCKED just picks a different page next time; this one's claim
+  // goes stale and gets reclaimed in a few minutes if it's still stuck).
+  try {
+    const fileRes = await fetch(claimed.storageUrl);
+    if (!fileRes.ok) {
+      // The file itself is missing/unreachable — record it as a failed page
+      // and drop it from the queue rather than reclaiming it forever.
+      const message = `Could not fetch queued file (${fileRes.status})`;
+      await prisma.extractionAttempt.create({
+        data: {
+          provider: "claude-vision",
+          processingJobId: claimed.processingJobId,
+          sourcePage: claimed.sourcePage,
+          rawResponse: { error: message },
+          succeeded: false,
+          errorMessage: message,
+          sourceImageUrl: claimed.storageUrl,
+        },
+      });
+      await prisma.processingJob.update({
+        where: { id: claimed.processingJobId },
+        data: { processedPages: { increment: 1 }, failedPages: { increment: 1 } },
+      });
+      await prisma.pendingPage.delete({ where: { id: claimed.id } });
+      await maybeCompleteJob(claimed.processingJobId);
+      triggerPageProcessing(req.nextUrl.origin);
+      return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: false });
+    }
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
+
+    const result = await processInvoicePage({
+      buffer,
+      mimeType: claimed.mimeType,
+      sourceFileName: claimed.sourceFileName,
+      sourcePage: claimed.sourcePage,
+      processingJobId: claimed.processingJobId,
+      sourceImageUrl: claimed.storageUrl,
     });
+
+    // "APPROVED" here always means an exact-$0.00-difference invoice that
+    // processInvoicePage auto-approved at creation (a PASS, just skipped the
+    // manual click) — count it as passed, not as an unaccounted-for fourth
+    // bucket, so passed+review+failed always sums to processed.
+    const isPassed =
+      result.ok &&
+      (result.invoice.validationStatus === "PASS" || result.invoice.validationStatus === "APPROVED");
     await prisma.processingJob.update({
       where: { id: claimed.processingJobId },
-      data: { processedPages: { increment: 1 }, failedPages: { increment: 1 } },
+      data: {
+        processedPages: { increment: 1 },
+        passedPages: { increment: isPassed ? 1 : 0 },
+        reviewPages: {
+          increment: result.ok && result.invoice.validationStatus === "REVIEW" ? 1 : 0,
+        },
+        failedPages: { increment: result.ok ? 0 : 1 },
+      },
     });
     await prisma.pendingPage.delete({ where: { id: claimed.id } });
     await maybeCompleteJob(claimed.processingJobId);
+
     triggerPageProcessing(req.nextUrl.origin);
-    return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: false });
+
+    return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: result.ok });
+  } catch (err) {
+    console.error(`process-next: unhandled error on page ${claimed.sourcePage} (${claimed.id}):`, err);
+    triggerPageProcessing(req.nextUrl.origin);
+    return NextResponse.json(
+      { processed: false, sourcePage: claimed.sourcePage, error: (err as Error).message },
+      { status: 500 }
+    );
   }
-  const buffer = Buffer.from(await fileRes.arrayBuffer());
-
-  const result = await processInvoicePage({
-    buffer,
-    mimeType: claimed.mimeType,
-    sourceFileName: claimed.sourceFileName,
-    sourcePage: claimed.sourcePage,
-    processingJobId: claimed.processingJobId,
-    sourceImageUrl: claimed.storageUrl,
-  });
-
-  // "APPROVED" here always means an exact-$0.00-difference invoice that
-  // processInvoicePage auto-approved at creation (a PASS, just skipped the
-  // manual click) — count it as passed, not as an unaccounted-for fourth
-  // bucket, so passed+review+failed always sums to processed.
-  const isPassed =
-    result.ok &&
-    (result.invoice.validationStatus === "PASS" || result.invoice.validationStatus === "APPROVED");
-  await prisma.processingJob.update({
-    where: { id: claimed.processingJobId },
-    data: {
-      processedPages: { increment: 1 },
-      passedPages: { increment: isPassed ? 1 : 0 },
-      reviewPages: {
-        increment: result.ok && result.invoice.validationStatus === "REVIEW" ? 1 : 0,
-      },
-      failedPages: { increment: result.ok ? 0 : 1 },
-    },
-  });
-  await prisma.pendingPage.delete({ where: { id: claimed.id } });
-  await maybeCompleteJob(claimed.processingJobId);
-
-  triggerPageProcessing(req.nextUrl.origin);
-
-  return NextResponse.json({ processed: true, sourcePage: claimed.sourcePage, ok: result.ok });
 }
