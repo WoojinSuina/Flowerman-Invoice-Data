@@ -241,7 +241,49 @@ export default async function DashboardPage(props: {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div className="mt-8">
+        <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
+        <MonthlyBarChart
+          data={monthlyRevenue}
+          color="#2563eb"
+          highlightMonthValue={monthParam(monthStart)}
+        />
+      </div>
+
+      <div className="mt-8">
+        <h2 className="mb-2 font-medium">Revenue by week</h2>
+        {weeklyRevenue.length === 0 ? (
+          <p className="text-sm text-gray-500">No data yet.</p>
+        ) : (
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4">Week</th>
+                <th className="py-2 pr-4">Invoices</th>
+                <th className="py-2 pr-4">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weeklyRevenue.map((week) => (
+                <tr key={week.weekStart.toISOString()} className="border-b">
+                  <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
+                  <td className="py-2 pr-4 tabular-nums">
+                    <Link
+                      href={`/review?status=ALL&week=${weekParam(week.weekStart)}`}
+                      className="text-blue-600 underline"
+                    >
+                      {week.count}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="font-medium">Top stores</h2>
@@ -328,48 +370,6 @@ export default async function DashboardPage(props: {
             </table>
           )}
         </div>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
-        <MonthlyBarChart
-          data={monthlyRevenue}
-          color="#2563eb"
-          highlightMonthValue={monthParam(monthStart)}
-        />
-      </div>
-
-      <div className="mt-8">
-        <h2 className="mb-2 font-medium">Revenue by week</h2>
-        {weeklyRevenue.length === 0 ? (
-          <p className="text-sm text-gray-500">No data yet.</p>
-        ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-4">Week</th>
-                <th className="py-2 pr-4">Invoices</th>
-                <th className="py-2 pr-4">Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {weeklyRevenue.map((week) => (
-                <tr key={week.weekStart.toISOString()} className="border-b">
-                  <td className="py-2 pr-4">{formatWeekLabel(week.weekStart)}</td>
-                  <td className="py-2 pr-4 tabular-nums">
-                    <Link
-                      href={`/review?status=ALL&week=${weekParam(week.weekStart)}`}
-                      className="text-blue-600 underline"
-                    >
-                      {week.count}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     </main>
   );
