@@ -88,10 +88,9 @@ export default async function DashboardPage(props: {
       prisma.invoice.aggregate({ _sum: { calculatedTotalChargesCents: true }, where: thisMonth }),
       prisma.invoice.count({ where: { ...thisMonth, validationStatus: "REVIEW" } }),
       getMismatchedInvoices(),
-      prisma.$queryRaw<{ month: string; revenue_cents: number; invoice_count: number }[]>`
+      prisma.$queryRaw<{ month: string; revenue_cents: number }[]>`
       SELECT to_char(invoice_date, 'YYYY-MM') AS month,
-             SUM(calculated_amount_due_cents)::int AS revenue_cents,
-             COUNT(*)::int AS invoice_count
+             SUM(calculated_amount_due_cents)::int AS revenue_cents
       FROM invoices
       WHERE invoice_date >= ${yearStart} AND invoice_date < ${nextYearStart}
       GROUP BY month
@@ -104,25 +103,16 @@ export default async function DashboardPage(props: {
   // with data so far.
   const monthlyByKey = new Map(monthlyRaw.map((r) => [r.month, r]));
   const monthlyRevenue: MonthlyBarDatum[] = [];
-  const monthlyVolume: MonthlyBarDatum[] = [];
   for (let m = 0; m < 12; m++) {
     const monthDate = new Date(Date.UTC(year, m, 1));
     const monthValue = monthParam(monthDate);
     const label = monthDate.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
-    const row = monthlyByKey.get(monthValue);
-    const revenueCents = row?.revenue_cents ?? 0;
-    const invoiceCount = row?.invoice_count ?? 0;
+    const revenueCents = monthlyByKey.get(monthValue)?.revenue_cents ?? 0;
     monthlyRevenue.push({
       label,
       monthValue,
       value: revenueCents,
       displayValue: formatCents(revenueCents),
-    });
-    monthlyVolume.push({
-      label,
-      monthValue,
-      value: invoiceCount,
-      displayValue: invoiceCount.toLocaleString(),
     });
   }
 
@@ -340,15 +330,13 @@ export default async function DashboardPage(props: {
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
-        <div>
-          <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
-          <MonthlyBarChart data={monthlyRevenue} color="#2563eb" />
-        </div>
-        <div>
-          <h2 className="mb-4 font-medium">Invoices by month ({year})</h2>
-          <MonthlyBarChart data={monthlyVolume} color="#ea580c" />
-        </div>
+      <div className="mt-8">
+        <h2 className="mb-4 font-medium">Revenue by month ({year})</h2>
+        <MonthlyBarChart
+          data={monthlyRevenue}
+          color="#2563eb"
+          highlightMonthValue={monthParam(monthStart)}
+        />
       </div>
 
       <div className="mt-8">
