@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
+import { formatInvoiceDate } from "@/lib/dates";
 import { StatusBadge } from "@/components/review/StatusBadge";
 import { PdfPageImage } from "@/components/review/PdfPageImage";
 import { RetryFailedPageButton } from "@/components/jobs/RetryFailedPageButton";
@@ -115,6 +116,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
             <tr className="border-b text-left text-gray-500">
               <th className="py-2 pr-4">Page</th>
               <th className="py-2 pr-4">Invoice #</th>
+              <th className="py-2 pr-4">Date</th>
               <th className="py-2 pr-4">Store</th>
               <th className="py-2 pr-4">Status</th>
               <th className="py-2 pr-4">Total Due</th>
@@ -137,6 +139,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                       {invoice.invoiceNumber}
                     </Link>
                   </td>
+                  <td className="py-2 pr-4">{formatInvoiceDate(invoice.invoiceDate)}</td>
                   <td className="py-2 pr-4">{invoice.store.name}</td>
                   <td className="py-2 pr-4">
                     <StatusBadge status={invoice.validationStatus} />
@@ -151,7 +154,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
           </tbody>
           <tfoot>
             <tr className="border-t-2 font-medium">
-              <td className="py-2 pr-4" colSpan={4}>
+              <td className="py-2 pr-4" colSpan={5}>
                 Grand total ({job.invoices.length} invoice{job.invoices.length === 1 ? "" : "s"})
               </td>
               <td className="py-2 pr-4">{formatCents(grandTotalCents)}</td>
