@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface Option {
@@ -33,8 +34,27 @@ export function ReviewFilters({
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  // Local state + a short debounce so navigation (and the resulting DB
+  // query) fires once typing pauses, not on every keystroke.
+  const [searchText, setSearchText] = useState(searchParams.get("search") ?? "");
+  useEffect(() => {
+    const current = searchParams.get("search") ?? "";
+    if (searchText === current) return;
+    const timeout = setTimeout(() => update({ search: searchText || null }), 400);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText]);
+
   return (
     <div className="mb-4 flex flex-wrap gap-3">
+      <input
+        type="text"
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        placeholder="Search invoice #, store, or date (e.g. 9/17/26)"
+        className="w-72 rounded border px-2 py-1 text-sm"
+      />
+
       <select
         value={searchParams.get("store") ?? ""}
         onChange={(e) => update({ store: e.target.value || null })}

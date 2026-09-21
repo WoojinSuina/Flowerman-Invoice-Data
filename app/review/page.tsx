@@ -39,6 +39,7 @@ export default async function ReviewListPage(props: {
     store?: string;
     month?: string;
     week?: string;
+    search?: string;
   }>;
 }) {
   const searchParams = await props.searchParams;
@@ -47,17 +48,32 @@ export default async function ReviewListPage(props: {
   const storeFilter = searchParams.store ?? "";
   const monthFilter = searchParams.month ?? "";
   const weekFilter = searchParams.week ?? "";
+  const searchFilter = searchParams.search ?? "";
 
   function buildQuery(overrides: Record<string, string | undefined>) {
     const params = new URLSearchParams();
-    const merged = { status, page: String(page), store: storeFilter, month: monthFilter, week: weekFilter, ...overrides };
+    const merged = {
+      status,
+      page: String(page),
+      store: storeFilter,
+      month: monthFilter,
+      week: weekFilter,
+      search: searchFilter,
+      ...overrides,
+    };
     for (const [key, value] of Object.entries(merged)) {
       if (value) params.set(key, value);
     }
     return `/review?${params.toString()}`;
   }
 
-  const filterParams = { status, store: storeFilter, month: monthFilter, week: weekFilter };
+  const filterParams = {
+    status,
+    store: storeFilter,
+    month: monthFilter,
+    week: weekFilter,
+    search: searchFilter,
+  };
   const where = buildReviewWhere(filterParams);
   // Approved invoices are ordered by when they were last touched, not by
   // invoice date, so approving/correcting one brings it to the top instead

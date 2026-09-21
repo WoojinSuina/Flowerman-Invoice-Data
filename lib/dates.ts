@@ -60,6 +60,45 @@ export function formatWeekLabel(weekStart: Date): string {
   return `${fmt(weekStart)} – ${fmt(weekEnd)}`;
 }
 
+function validUtcDate(year: number, monthIndex: number, day: number): Date | null {
+  const date = new Date(Date.UTC(year, monthIndex, day));
+  // Date.UTC silently rolls an out-of-range month/day into a different
+  // date (e.g. day 32 becomes the 1st/2nd of the next month) instead of
+  // erroring — reject anything that didn't round-trip exactly.
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== monthIndex ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+// Parses a free-typed search box date (the Review search bar) into a UTC
+// midnight Date, or null if it doesn't look like a date at all — in which
+// case the caller falls back to matching invoice #/store name instead.
+// Accepts "YYYY-MM-DD" and US "M/D/YYYY" or "M/D/YY" (2-digit year prefixed
+// with "20", same convention the extraction prompt uses).
+export function parseSearchDate(input: string): Date | null {
+  const trimmed = input.trim();
+
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const [, y, m, d] = iso;
+    return validUtcDate(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const us = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (us) {
+    const [, m, d, yRaw] = us;
+    const year = yRaw.length === 2 ? 2000 + Number(yRaw) : Number(yRaw);
+    return validUtcDate(year, Number(m) - 1, Number(d));
+  }
+
+  return null;
+}
+
 // A delivery invoice can never be dated after today — this is a hard
 // business-logic fact, not a heuristic. Used to force REVIEW on an
 // impossible date (usually a month/day swap on a hard-to-read scan) instead

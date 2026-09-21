@@ -1,5 +1,5 @@
 import type { Prisma, ValidationStatus } from "@prisma/client";
-import { parseMonthParam, parseWeekParam } from "@/lib/dates";
+import { parseMonthParam, parseSearchDate, parseWeekParam } from "@/lib/dates";
 import { prisma } from "@/lib/db/client";
 import { validateLineItem } from "@/lib/validation/engine";
 
@@ -8,6 +8,7 @@ export interface ReviewFilterParams {
   store?: string;
   month?: string;
   week?: string;
+  search?: string;
 }
 
 export function buildReviewWhere(filters: ReviewFilterParams): Prisma.InvoiceWhereInput {
@@ -36,6 +37,21 @@ export function buildReviewWhere(filters: ReviewFilterParams): Prisma.InvoiceWhe
       Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1)
     );
     where.invoiceDate = { gte: monthStart, lt: nextMonthStart };
+  }
+
+  if (filters.search?.trim()) {
+    const term = filters.search.trim();
+    const matches: Prisma.InvoiceWhereInput[] = [
+      { invoiceNumber: { contains: term, mode: "insensitive" } },
+      { store: { name: { contains: term, mode: "insensitive" } } },
+    ];
+    const searchDate = parseSearchDate(term);
+    if (searchDate) {
+      const nextDay = new Date(searchDate);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      matches.push({ invoiceDate: { gte: searchDate, lt: nextDay } });
+    }
+    where.OR = matches;
   }
 
   return where;
