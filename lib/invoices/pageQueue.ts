@@ -1,5 +1,7 @@
 import { after } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { isConsignmentStore } from "@/lib/stores";
+import { findWeekOffsetInvoices } from "./weekOffsetDates";
 
 export interface ClaimedPage {
   id: string;
@@ -41,6 +43,33 @@ export async function claimNextPendingPage(): Promise<ClaimedPage | null> {
 }
 
 /**
+ * A consignment store sometimes delivers using a leftover invoice form
+ * from the prior week, so the printed date reads a week early compared to
+ * the rest of the same batch. Runs once the whole batch is in so the
+ * "most common date" anchor it compares against is reliable, and only
+ * ever nudges consignment invoices forward — see findWeekOffsetInvoices.
+ */
+async function reconcileWeekOffsetDates(processingJobId: string): Promise<void> {
+  const invoices = await prisma.invoice.findMany({
+    where: { processingJobId },
+    select: { id: true, invoiceDate: true, store: { select: { name: true, address: true } } },
+  });
+  const corrections = findWeekOffsetInvoices(
+    invoices.map((inv) => ({
+      id: inv.id,
+      invoiceDate: inv.invoiceDate,
+      isConsignment: isConsignmentStore(inv.store),
+    }))
+  );
+  for (const correction of corrections) {
+    await prisma.invoice.update({
+      where: { id: correction.id },
+      data: { invoiceDate: correction.correctedDate },
+    });
+  }
+}
+
+/**
  * If this was the last queued page for its job, marks the job done.
  * Called after every page is processed (success or failure) and removed
  * from the queue.
@@ -48,6 +77,8 @@ export async function claimNextPendingPage(): Promise<ClaimedPage | null> {
 export async function maybeCompleteJob(processingJobId: string): Promise<void> {
   const remaining = await prisma.pendingPage.count({ where: { processingJobId } });
   if (remaining > 0) return;
+
+  await reconcileWeekOffsetDates(processingJobId);
 
   const job = await prisma.processingJob.findUniqueOrThrow({ where: { id: processingJobId } });
   await prisma.processingJob.update({
