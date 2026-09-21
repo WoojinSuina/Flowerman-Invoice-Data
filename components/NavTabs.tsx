@@ -31,7 +31,7 @@ export function NavTabs({
             href={link.href}
             className={
               active
-                ? "rounded-full bg-gray-900 px-3 py-1.5 text-sm font-medium text-white"
+                ? "rounded-full bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800"
                 : "rounded-full px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
             }
           >
