@@ -241,10 +241,12 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                     <td className="py-2 pr-4 text-red-700">{attempt.errorMessage}</td>
                     <td className="py-2 pr-4">
                       {attempt.sourceImageUrl && (
-                        <RetryFailedPageButton
-                          url={attempt.sourceImageUrl}
-                          page={attempt.sourcePage}
-                        />
+                        <span className="hidden md:inline">
+                          <RetryFailedPageButton
+                            url={attempt.sourceImageUrl}
+                            page={attempt.sourcePage}
+                          />
+                        </span>
                       )}
                     </td>
                   </tr>

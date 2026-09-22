@@ -29,14 +29,20 @@ export default async function JobsListPage() {
       </h1>
 
       <section className="rounded-lg border bg-white p-5 shadow-sm">
-        {!elderly && (
-          <p className="mb-4 text-sm text-gray-500">
-            Select one or more invoice images or multi-page PDFs (one invoice per page)
-            — each is split and processed automatically. Files upload one at a time;
-            add as many as you like and they&apos;ll queue up.
-          </p>
-        )}
-        <UploadForm />
+        <p className="text-sm text-gray-500 md:hidden">
+          Uploading is desktop-only — open this page on a computer to upload
+          scans.
+        </p>
+        <div className="hidden md:block">
+          {!elderly && (
+            <p className="mb-4 text-sm text-gray-500">
+              Select one or more invoice images or multi-page PDFs (one invoice per page)
+              — each is split and processed automatically. Files upload one at a time;
+              add as many as you like and they&apos;ll queue up.
+            </p>
+          )}
+          <UploadForm />
+        </div>
       </section>
 
       <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">

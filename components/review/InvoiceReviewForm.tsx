@@ -50,6 +50,13 @@ function ScannedImage({ url, alt }: { url: string; alt: string }) {
 // before they finished a decimal point or cleared a field to retype it.
 // The raw text is freely editable; it only gets normalized on blur.
 
+// Editing is desktop-only (see the notice in the form below) — every
+// input gets this on top of its own sizing/alignment classes so it looks
+// and behaves like plain text below the md breakpoint instead of an
+// editable field, with no JS/device detection needed.
+const MOBILE_READONLY =
+  "max-md:pointer-events-none max-md:border-transparent max-md:bg-transparent max-md:px-0";
+
 function MoneyInput({
   cents,
   onChange,
@@ -63,7 +70,7 @@ function MoneyInput({
     <input
       type="text"
       inputMode="decimal"
-      className="w-24 rounded border px-2 py-1 text-right"
+      className={`w-24 rounded border px-2 py-1 text-right ${MOBILE_READONLY}`}
       value={text}
       onChange={(e) => {
         const raw = e.target.value;
@@ -91,7 +98,7 @@ function QuantityInput({
     <input
       type="text"
       inputMode="numeric"
-      className="w-16 rounded border px-2 py-1 text-right"
+      className={`w-16 rounded border px-2 py-1 text-right ${MOBILE_READONLY}`}
       value={text}
       onChange={(e) => {
         const raw = e.target.value;
@@ -360,7 +367,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             Invoice date
             <input
               type="date"
-              className="rounded border px-2 py-1"
+              className={`rounded border px-2 py-1 ${MOBILE_READONLY}`}
               value={invoiceDate}
               onChange={(e) => setInvoiceDate(e.target.value)}
             />
@@ -409,7 +416,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
                 >
                   <td className="py-1 pr-2">
                     <input
-                      className="w-32 rounded border px-2 py-1"
+                      className={`w-32 rounded border px-2 py-1 ${MOBILE_READONLY}`}
                       value={item.productName}
                       onChange={(e) => updateItem(item.id, { productName: e.target.value })}
                     />
@@ -472,7 +479,11 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
           {formatCents(liveValidation.differenceCents)}
         </div>
 
-        <div className="flex gap-3">
+        <p className="mb-4 text-sm text-gray-500 md:hidden">
+          This is a view-only summary on a phone-sized screen — open it on a
+          computer to edit or approve.
+        </p>
+        <div className="hidden gap-3 md:flex">
           <button
             onClick={handleSave}
             disabled={saving || changedFields.length === 0}

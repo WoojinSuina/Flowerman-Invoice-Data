@@ -148,15 +148,17 @@ export default async function ReviewListPage(props: {
 
       <ReviewFilters stores={storeOptions} months={monthOptions} weeks={weekOptions} />
 
-      <BulkApproveButton
-        eligibleCount={zeroDiffApprovableIds.length}
-        label={`Approve all ${zeroDiffApprovableIds.length} with $0.00 difference`}
-      />
-      <BulkApproveButton
-        eligibleCount={toleranceApprovableIds.length}
-        maxDifferenceDollars={BULK_TOLERANCE_DOLLARS}
-        label={`Approve all ${toleranceApprovableIds.length} with under $${BULK_TOLERANCE_DOLLARS} difference (flagged for later review)`}
-      />
+      <div className="hidden md:block">
+        <BulkApproveButton
+          eligibleCount={zeroDiffApprovableIds.length}
+          label={`Approve all ${zeroDiffApprovableIds.length} with $0.00 difference`}
+        />
+        <BulkApproveButton
+          eligibleCount={toleranceApprovableIds.length}
+          maxDifferenceDollars={BULK_TOLERANCE_DOLLARS}
+          label={`Approve all ${toleranceApprovableIds.length} with under $${BULK_TOLERANCE_DOLLARS} difference (flagged for later review)`}
+        />
+      </div>
 
       {invoices.length === 0 ? (
         <p className="text-gray-500">No invoices match these filters.</p>
