@@ -58,7 +58,7 @@ export function ReviewFilters({
       <select
         value={searchParams.get("store") ?? ""}
         onChange={(e) => update({ store: e.target.value || null })}
-        className="rounded border px-2 py-1 text-sm"
+        className="w-full rounded border px-2 py-1 text-sm sm:w-40"
       >
         <option value="">All stores</option>
         {stores.map((s) => (
@@ -71,7 +71,7 @@ export function ReviewFilters({
       <select
         value={searchParams.get("month") ?? ""}
         onChange={(e) => update({ month: e.target.value || null, week: null })}
-        className="rounded border px-2 py-1 text-sm"
+        className="w-full rounded border px-2 py-1 text-sm sm:w-40"
       >
         <option value="">All months</option>
         {months.map((m) => (
@@ -84,7 +84,7 @@ export function ReviewFilters({
       <select
         value={searchParams.get("week") ?? ""}
         onChange={(e) => update({ week: e.target.value || null, month: null })}
-        className="rounded border px-2 py-1 text-sm"
+        className="w-full rounded border px-2 py-1 text-sm sm:w-40"
       >
         <option value="">All weeks</option>
         {weeks.map((w) => (
