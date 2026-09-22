@@ -248,7 +248,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         }
       >
         {invoice.sourceImageUrl && (
-          <div className="mb-2 flex items-center gap-4">
+          <div className="mb-2 hidden items-center gap-4 md:flex">
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
@@ -305,7 +305,7 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
         </div>
       </div>
 
-      {!expanded && <div>
+      {!expanded && <div className="hidden md:block">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold">
