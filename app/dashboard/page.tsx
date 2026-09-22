@@ -6,6 +6,9 @@ import { MonthSelect } from "@/components/dashboard/MonthSelect";
 import { StoreListModal } from "@/components/dashboard/StoreListModal";
 import { MonthlyBarChart, type MonthlyBarDatum } from "@/components/dashboard/MonthlyBarChart";
 import { getMismatchedInvoices, summarizeMismatches } from "@/lib/reconciliation";
+import { T } from "@/components/T";
+import { isElderlyMode } from "@/lib/elderlyMode";
+import type { ReactNode } from "react";
 import {
   parseMonthParam,
   monthParam,
@@ -33,10 +36,10 @@ function StatTile({
   href,
   sub,
 }: {
-  label: string;
+  label: ReactNode;
   value: string;
   href?: string;
-  sub?: string;
+  sub?: ReactNode;
 }) {
   const content = (
     <div className="h-full min-w-0 rounded-lg border bg-white p-4 shadow-sm">
@@ -58,6 +61,7 @@ export default async function DashboardPage(props: {
   searchParams: Promise<{ month?: string }>;
 }) {
   const searchParams = await props.searchParams;
+  const elderly = await isElderlyMode();
   const monthStart = parseMonthParam(searchParams.month);
   const nextMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
   const monthLabel = formatMonthLabel(monthStart);
@@ -211,37 +215,46 @@ export default async function DashboardPage(props: {
   return (
     <main className="mx-auto max-w-5xl p-6">
       <NavBar />
-      <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
+      <h1 className="mb-4 text-2xl font-semibold">
+        <T k="dashboard" elderly={elderly} />
+      </h1>
 
       <div className="mb-4">
         <MonthSelect value={monthParam(monthStart)} options={monthOptions} />
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
-        <StatTile label="Total invoices" value={totalInvoices.toLocaleString()} />
+        <StatTile label={<T k="totalInvoices" elderly={elderly} />} value={totalInvoices.toLocaleString()} />
         <StatTile
-          label="Potential revenue (no returns)"
+          label={<T k="potentialRevenueNoReturns" elderly={elderly} />}
           value={formatCents(potentialRevenue._sum.calculatedTotalChargesCents ?? 0)}
         />
         <StatTile
-          label="Revenue"
+          label={<T k="revenue" elderly={elderly} />}
           value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
         />
         <StatTile
-          label="Needs review"
+          label={<T k="needsReview" elderly={elderly} />}
           value={reviewCount.toLocaleString()}
           href="/review?status=REVIEW"
         />
         <StatTile
-          label="Write-in error impact"
+          label={<T k="writeInErrorImpact" elderly={elderly} />}
           value={formatCents(reconciliationSummary.approvedNetCents)}
-          sub={`approved invoices, ${monthLabel}`}
+          sub={
+            <>
+              <T k="approvedInvoicesSub" elderly={elderly} />
+              {monthLabel}
+            </>
+          }
           href="/reconciliation"
         />
       </div>
 
       <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Revenue by month ({year})</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <T k="revenueByMonth" elderly={elderly} /> ({year})
+        </h2>
         <MonthlyBarChart
           data={monthlyRevenue}
           color="#2563eb"
@@ -251,17 +264,27 @@ export default async function DashboardPage(props: {
       </section>
 
       <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Revenue by week</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <T k="revenueByWeek" elderly={elderly} />
+        </h2>
         {weeklyRevenue.length === 0 ? (
-          <p className="text-sm text-gray-500">No data yet.</p>
+          <p className="text-sm text-gray-500">
+            <T k="noDataYet" elderly={elderly} />
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-4">Week</th>
-                  <th className="py-2 pr-4">Invoices</th>
-                  <th className="py-2 pr-4">Revenue</th>
+                  <th className="py-2 pr-4">
+                    <T k="week" elderly={elderly} />
+                  </th>
+                  <th className="py-2 pr-4">
+                    <T k="invoicesCount" elderly={elderly} />
+                  </th>
+                  <th className="py-2 pr-4">
+                    <T k="revenue" elderly={elderly} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -288,24 +311,40 @@ export default async function DashboardPage(props: {
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
         <section className="rounded-lg border bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Top stores</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              <T k="topStores" elderly={elderly} />
+            </h2>
             {topStoresRaw.length > 0 && (
               <StoreListModal stores={allStoresEnriched} month={monthParam(monthStart)} />
             )}
           </div>
           {topFiveStores.length === 0 ? (
-            <p className="text-sm text-gray-500">No data yet.</p>
+            <p className="text-sm text-gray-500">
+              <T k="noDataYet" elderly={elderly} />
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
-                    <th className="py-2 pr-4">Store</th>
-                    <th className="py-2 pr-4">Delivered</th>
-                    <th className="py-2 pr-4">Sold</th>
-                    <th className="py-2 pr-4">Unsold</th>
-                    <th className="py-2 pr-4">% sold</th>
-                    <th className="py-2 pr-4">Revenue</th>
+                    <th className="py-2 pr-4">
+                      <T k="store" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="delivered" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="sold" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="unsold" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="percentSold" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="revenue" elderly={elderly} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -339,20 +378,36 @@ export default async function DashboardPage(props: {
         </section>
 
         <section className="rounded-lg border bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Top products</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            <T k="topProducts" elderly={elderly} />
+          </h2>
           {topProductsRaw.length === 0 ? (
-            <p className="text-sm text-gray-500">No data yet.</p>
+            <p className="text-sm text-gray-500">
+              <T k="noDataYet" elderly={elderly} />
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
-                    <th className="py-2 pr-4">Product</th>
-                    <th className="py-2 pr-4">Delivered</th>
-                    <th className="py-2 pr-4">Sold</th>
-                    <th className="py-2 pr-4">Unsold</th>
-                    <th className="py-2 pr-4">% sold</th>
-                    <th className="py-2 pr-4">Revenue</th>
+                    <th className="py-2 pr-4">
+                      <T k="product" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="delivered" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="sold" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="unsold" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="percentSold" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="revenue" elderly={elderly} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
