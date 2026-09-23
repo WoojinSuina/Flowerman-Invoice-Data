@@ -85,7 +85,7 @@ export default async function DashboardPage(props: {
   const yearStart = new Date(Date.UTC(year, 0, 1));
   const nextYearStart = new Date(Date.UTC(year + 1, 0, 1));
 
-  const [totalInvoices, revenue, potentialRevenue, reviewCount, mismatches, monthlyRaw] =
+  const [totalInvoices, revenue, potentialRevenue, reviewCount, mismatches, monthlyRaw, monthlyProfitRaw] =
     await Promise.all([
       prisma.invoice.count({ where: thisMonth }),
       prisma.invoice.aggregate({ _sum: { calculatedAmountDueCents: true }, where: thisMonth }),
@@ -99,6 +99,23 @@ export default async function DashboardPage(props: {
       WHERE invoice_date >= ${yearStart} AND invoice_date < ${nextYearStart}
       GROUP BY month
     `,
+      // Profit needs item-level cost (from products.cost_cents, not on
+      // invoices at all), so this is a separate join rather than part of
+      // the invoice-level query above. A product with no cost set yet is
+      // excluded from the sum (FILTER), not treated as free.
+      prisma.$queryRaw<{ month: string; profit_cents: number }[]>`
+      SELECT to_char(i.invoice_date, 'YYYY-MM') AS month,
+             COALESCE(
+               SUM(ii.net_sold_amount_cents - p.cost_cents * ii.sold_quantity)
+                 FILTER (WHERE p.cost_cents IS NOT NULL),
+               0
+             )::int AS profit_cents
+      FROM invoice_items ii
+      JOIN invoices i ON i.id = ii.invoice_id
+      LEFT JOIN products p ON p.id = ii.product_id
+      WHERE i.invoice_date >= ${yearStart} AND i.invoice_date < ${nextYearStart}
+      GROUP BY month
+    `,
     ]);
   const reconciliationSummary = summarizeMismatches(mismatches);
 
@@ -106,17 +123,21 @@ export default async function DashboardPage(props: {
   // yet, so the shape of the year is visible rather than just the months
   // with data so far.
   const monthlyByKey = new Map(monthlyRaw.map((r) => [r.month, r]));
+  const monthlyProfitByKey = new Map(monthlyProfitRaw.map((r) => [r.month, r]));
   const monthlyRevenue: MonthlyBarDatum[] = [];
   for (let m = 0; m < 12; m++) {
     const monthDate = new Date(Date.UTC(year, m, 1));
     const monthValue = monthParam(monthDate);
     const label = monthDate.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
     const revenueCents = monthlyByKey.get(monthValue)?.revenue_cents ?? 0;
+    const profitCents = monthlyProfitByKey.get(monthValue)?.profit_cents ?? 0;
     monthlyRevenue.push({
       label,
       monthValue,
       value: revenueCents,
       displayValue: formatWholeDollars(revenueCents),
+      secondaryValue: profitCents,
+      secondaryDisplayValue: formatWholeDollars(profitCents),
     });
   }
 
@@ -213,7 +234,10 @@ export default async function DashboardPage(props: {
     where: thisMonth,
     select: { invoiceDate: true, calculatedAmountDueCents: true },
   });
-  const revenueByWeek = new Map<string, { weekStart: Date; revenueCents: number; count: number }>();
+  const revenueByWeek = new Map<
+    string,
+    { weekStart: Date; revenueCents: number; count: number; profitCents: number }
+  >();
   for (const inv of allInvoiceDates) {
     const weekStart = getWeekStart(inv.invoiceDate);
     const key = weekStart.toISOString();
@@ -222,9 +246,39 @@ export default async function DashboardPage(props: {
       existing.revenueCents += inv.calculatedAmountDueCents;
       existing.count += 1;
     } else {
-      revenueByWeek.set(key, { weekStart, revenueCents: inv.calculatedAmountDueCents, count: 1 });
+      revenueByWeek.set(key, {
+        weekStart,
+        revenueCents: inv.calculatedAmountDueCents,
+        count: 1,
+        profitCents: 0,
+      });
     }
   }
+
+  // Same "skip products with no cost set" rule as the Profit KPI tile —
+  // item-level data, since cost lives on Product, not Invoice.
+  const monthItemsForProfit = await prisma.invoiceItem.findMany({
+    where: { invoice: thisMonth, productId: { not: null } },
+    select: {
+      soldQuantity: true,
+      netSoldAmountCents: true,
+      invoice: { select: { invoiceDate: true } },
+      product: { select: { costCents: true } },
+    },
+  });
+  for (const item of monthItemsForProfit) {
+    if (item.product?.costCents == null) continue;
+    const weekStart = getWeekStart(item.invoice.invoiceDate);
+    const key = weekStart.toISOString();
+    const existing = revenueByWeek.get(key);
+    const profitCents = item.netSoldAmountCents - item.product.costCents * item.soldQuantity;
+    if (existing) {
+      existing.profitCents += profitCents;
+    } else {
+      revenueByWeek.set(key, { weekStart, revenueCents: 0, count: 0, profitCents });
+    }
+  }
+
   const weeklyRevenue = [...revenueByWeek.values()].sort(
     (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
   );
@@ -285,6 +339,9 @@ export default async function DashboardPage(props: {
         <MonthlyBarChart
           data={monthlyRevenue}
           color="#2563eb"
+          secondaryColor="#ea580c"
+          seriesLabel="Revenue"
+          secondarySeriesLabel="Profit"
           selectedMonthValue={monthParam(monthStart)}
           todayMonthValue={monthParam(new Date())}
         />
@@ -312,6 +369,9 @@ export default async function DashboardPage(props: {
                   <th className="py-2 pr-4">
                     <T k="revenue" elderly={elderly} />
                   </th>
+                  <th className="py-2 pr-4">
+                    <T k="profit" elderly={elderly} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -327,6 +387,7 @@ export default async function DashboardPage(props: {
                       </Link>
                     </td>
                     <td className="py-2 pr-4 tabular-nums">{formatCents(week.revenueCents)}</td>
+                    <td className="py-2 pr-4 tabular-nums">{formatCents(week.profitCents)}</td>
                   </tr>
                 ))}
               </tbody>
