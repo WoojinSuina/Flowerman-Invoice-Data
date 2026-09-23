@@ -51,6 +51,7 @@ export const translations = {
   totalInvoices: { ja: "請求書合計", en: "Total invoices" },
   potentialRevenueNoReturns: { ja: "潜在収益（返品なし）", en: "Potential revenue (no returns)" },
   revenue: { ja: "収益", en: "Revenue" },
+  profit: { ja: "利益", en: "Profit" },
   needsReview: { ja: "要確認", en: "Needs review" },
   writeInErrorImpact: { ja: "記入誤差の影響", en: "Write-in error impact" },
   approvedInvoicesSub: { ja: "承認済みの請求書、", en: "approved invoices, " },

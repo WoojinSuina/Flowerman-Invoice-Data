@@ -192,6 +192,23 @@ export default async function DashboardPage(props: {
   });
   const productById = new Map(products.map((p) => [p.id, p]));
 
+  // Profit only counts products with a cost set (lib/... has none of this
+  // in the invoice data itself — it is entered by hand on the Products
+  // page) — a product with no cost yet is left out of the total rather
+  // than assumed to cost $0, which would overstate profit.
+  let totalProfitCents = 0;
+  let productsMissingCost = 0;
+  for (const row of topProductsRaw) {
+    const product = row.productId ? productById.get(row.productId) : undefined;
+    if (!product || product.costCents == null) {
+      productsMissingCost += 1;
+      continue;
+    }
+    const soldQuantity = row._sum.soldQuantity ?? 0;
+    const revenueCents = row._sum.netSoldAmountCents ?? 0;
+    totalProfitCents += revenueCents - product.costCents * soldQuantity;
+  }
+
   const allInvoiceDates = await prisma.invoice.findMany({
     where: thisMonth,
     select: { invoiceDate: true, calculatedAmountDueCents: true },
@@ -223,7 +240,7 @@ export default async function DashboardPage(props: {
         <MonthSelect value={monthParam(monthStart)} options={monthOptions} />
       </div>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-6">
         <StatTile label={<T k="totalInvoices" elderly={elderly} />} value={totalInvoices.toLocaleString()} />
         <StatTile
           label={<T k="potentialRevenueNoReturns" elderly={elderly} />}
@@ -232,6 +249,16 @@ export default async function DashboardPage(props: {
         <StatTile
           label={<T k="revenue" elderly={elderly} />}
           value={formatCents(revenue._sum.calculatedAmountDueCents ?? 0)}
+        />
+        <StatTile
+          label={<T k="profit" elderly={elderly} />}
+          value={formatCents(totalProfitCents)}
+          href="/products"
+          sub={
+            productsMissingCost > 0
+              ? `${productsMissingCost} product${productsMissingCost === 1 ? "" : "s"} without a set cost excluded`
+              : undefined
+          }
         />
         <StatTile
           label={<T k="needsReview" elderly={elderly} />}
@@ -408,20 +435,34 @@ export default async function DashboardPage(props: {
                     <th className="py-2 pr-4">
                       <T k="revenue" elderly={elderly} />
                     </th>
+                    <th className="py-2 pr-4">
+                      <T k="profit" elderly={elderly} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {topProductsRaw.map((row) => {
                     const product = row.productId ? productById.get(row.productId) : undefined;
+                    const soldQuantity = row._sum.soldQuantity ?? 0;
+                    const revenueCents = row._sum.netSoldAmountCents ?? 0;
+                    const profitCents =
+                      product?.costCents != null ? revenueCents - product.costCents * soldQuantity : null;
                     return (
                       <tr key={row.productId} className="border-b">
                         <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
                         <td className="py-2 pr-4 tabular-nums">{row._sum.deliveredQuantity ?? 0}</td>
-                        <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
+                        <td className="py-2 pr-4 tabular-nums">{soldQuantity}</td>
                         <td className="py-2 pr-4 tabular-nums">{row.qtyUnsold}</td>
                         <td className="py-2 pr-4 tabular-nums">{formatPercent(row.percentSold)}</td>
+                        <td className="py-2 pr-4 tabular-nums">{formatCents(revenueCents)}</td>
                         <td className="py-2 pr-4 tabular-nums">
-                          {formatCents(row._sum.netSoldAmountCents ?? 0)}
+                          {profitCents !== null ? (
+                            formatCents(profitCents)
+                          ) : (
+                            <Link href="/products" className="text-xs text-gray-400 underline">
+                              set cost
+                            </Link>
+                          )}
                         </td>
                       </tr>
                     );
