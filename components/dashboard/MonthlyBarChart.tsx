@@ -14,12 +14,12 @@ export interface MonthlyBarDatum {
   secondaryDisplayValue: string;
 }
 
-const CHART_HEIGHT_PX = 140;
+const CHART_HEIGHT_PX = 160;
 // A fixed per-month column width (rather than flex-1 splitting the
 // available width) so 12 months of labeled bars stay legible instead of
 // being squeezed to fit a narrow screen — the chart scrolls horizontally
 // on a phone instead.
-const COLUMN_WIDTH_PX = 72;
+const COLUMN_WIDTH_PX = 92;
 
 /**
  * A two-series grouped bar chart (e.g. revenue + profit) across the 12
@@ -56,14 +56,14 @@ export function MonthlyBarChart({
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
+      <div className="mb-3 flex items-center gap-4 text-sm font-medium text-gray-600">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
           {seriesLabel}
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5">
           <span
-            className="inline-block h-2.5 w-2.5 rounded-sm"
+            className="inline-block h-3 w-3 rounded-sm"
             style={{ backgroundColor: secondaryColor }}
           />
           {secondarySeriesLabel}
@@ -97,13 +97,13 @@ export function MonthlyBarChart({
                     title="Current month"
                   />
                 )}
-                <div className="flex items-end gap-1">
+                <div className="flex items-end gap-1.5">
                   <div className="flex flex-col items-center justify-end" style={{ height: CHART_HEIGHT_PX }}>
                     <span
                       className={
                         isSelected
-                          ? "mb-1 whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums text-amber-800"
-                          : "mb-1 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-gray-600 group-hover:text-gray-900"
+                          ? "mb-1 whitespace-nowrap text-xs font-semibold leading-none tabular-nums text-amber-800"
+                          : "mb-1 whitespace-nowrap text-xs font-semibold leading-none tabular-nums text-gray-700 group-hover:text-gray-900"
                       }
                     >
                       {d.displayValue}
@@ -111,18 +111,18 @@ export function MonthlyBarChart({
                     <div
                       className={
                         isSelected
-                          ? "w-4 rounded-t ring-2 ring-offset-1 ring-amber-500"
-                          : "w-4 rounded-t transition-opacity group-hover:opacity-80"
+                          ? "w-6 rounded-t ring-2 ring-offset-1 ring-amber-500"
+                          : "w-6 rounded-t transition-opacity group-hover:opacity-80"
                       }
                       style={{ height: barHeight, backgroundColor: color }}
                     />
                   </div>
                   <div className="flex flex-col items-center justify-end" style={{ height: CHART_HEIGHT_PX }}>
-                    <span className="mb-1 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-gray-600 group-hover:text-gray-900">
+                    <span className="mb-1 whitespace-nowrap text-xs font-semibold leading-none tabular-nums text-gray-700 group-hover:text-gray-900">
                       {d.secondaryDisplayValue}
                     </span>
                     <div
-                      className="w-4 rounded-t transition-opacity group-hover:opacity-80"
+                      className="w-6 rounded-t transition-opacity group-hover:opacity-80"
                       style={{ height: secondaryHeight, backgroundColor: secondaryColor }}
                     />
                   </div>

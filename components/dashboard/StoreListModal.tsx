@@ -10,13 +10,8 @@ interface StoreRow {
   storeAddress: string | null;
   qtySold: number;
   qtyDelivered: number;
-  qtyUnsold: number;
-  percentSold: number | null;
   revenueCents: number;
-}
-
-function formatPercent(percent: number | null): string {
-  return percent === null ? "—" : `${percent.toFixed(0)}%`;
+  profitCents: number;
 }
 
 export function StoreListModal({ stores, month }: { stores: StoreRow[]; month: string }) {
@@ -42,7 +37,7 @@ export function StoreListModal({ stores, month }: { stores: StoreRow[]; month: s
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b p-4">
-              <h3 className="font-medium">All stores (by % sold)</h3>
+              <h3 className="font-medium">All stores (by profit)</h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -58,9 +53,8 @@ export function StoreListModal({ stores, month }: { stores: StoreRow[]; month: s
                     <th className="py-2 pr-4">Store</th>
                     <th className="py-2 pr-4">Delivered</th>
                     <th className="py-2 pr-4">Sold</th>
-                    <th className="py-2 pr-4">Unsold</th>
-                    <th className="py-2 pr-4">% sold</th>
                     <th className="py-2 pr-4">Revenue</th>
+                    <th className="py-2 pr-4">Profit</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -79,9 +73,8 @@ export function StoreListModal({ stores, month }: { stores: StoreRow[]; month: s
                       </td>
                       <td className="py-2 pr-4 tabular-nums">{s.qtyDelivered}</td>
                       <td className="py-2 pr-4 tabular-nums">{s.qtySold}</td>
-                      <td className="py-2 pr-4 tabular-nums">{s.qtyUnsold}</td>
-                      <td className="py-2 pr-4 tabular-nums">{formatPercent(s.percentSold)}</td>
                       <td className="py-2 pr-4 tabular-nums">{formatCents(s.revenueCents)}</td>
+                      <td className="py-2 pr-4 tabular-nums">{formatCents(s.profitCents)}</td>
                     </tr>
                   ))}
                 </tbody>

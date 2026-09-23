@@ -212,11 +212,10 @@ export default async function DashboardPage(props: {
     storeAddress: storeById.get(row.storeId)?.address ?? null,
     qtySold: row.qtySold,
     qtyDelivered: row.qtyDelivered,
-    qtyUnsold: row.qtyUnsold,
-    percentSold: row.percentSold,
     revenueCents: row.revenueCents,
+    profitCents: row.profitCents,
   }));
-  const topFiveStores = topStoresRaw.slice(0, 5);
+  const topTenStores = topStoresRaw.slice(0, 10);
 
   const productAggRaw = await prisma.invoiceItem.groupBy({
     by: ["productId"],
@@ -429,7 +428,7 @@ export default async function DashboardPage(props: {
               <StoreListModal stores={allStoresEnriched} month={monthParam(monthStart)} />
             )}
           </div>
-          {topFiveStores.length === 0 ? (
+          {topTenStores.length === 0 ? (
             <p className="text-sm text-gray-500">
               <T k="noDataYet" elderly={elderly} />
             </p>
@@ -456,7 +455,7 @@ export default async function DashboardPage(props: {
                   </tr>
                 </thead>
                 <tbody>
-                  {topFiveStores.map((row) => {
+                  {topTenStores.map((row) => {
                     const store = storeById.get(row.storeId);
                     return (
                       <tr key={row.storeId} className="border-b">
