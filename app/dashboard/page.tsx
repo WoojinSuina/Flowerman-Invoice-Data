@@ -141,33 +141,56 @@ export default async function DashboardPage(props: {
     });
   }
 
+  // Fetched separately (all products, not just this month's) so it is
+  // ready before the store loop below needs it — profit is per-item
+  // (cost lives on Product), not something the invoice-level query above
+  // can give us.
+  const allProductCosts = await prisma.product.findMany({ select: { id: true, costCents: true } });
+  const costByProductId = new Map(allProductCosts.map((p) => [p.id, p.costCents]));
+
   const monthInvoicesForStores = await prisma.invoice.findMany({
     where: thisMonth,
     select: {
       storeId: true,
       calculatedAmountDueCents: true,
-      items: { select: { soldQuantity: true, deliveredQuantity: true } },
+      items: {
+        select: { soldQuantity: true, deliveredQuantity: true, netSoldAmountCents: true, productId: true },
+      },
     },
   });
   const storeAgg = new Map<
     string,
-    { qtySold: number; qtyDelivered: number; revenueCents: number; invoiceCount: number }
+    {
+      qtySold: number;
+      qtyDelivered: number;
+      revenueCents: number;
+      invoiceCount: number;
+      profitCents: number;
+    }
   >();
   for (const inv of monthInvoicesForStores) {
     const qtySold = inv.items.reduce((sum, item) => sum + item.soldQuantity, 0);
     const qtyDelivered = inv.items.reduce((sum, item) => sum + item.deliveredQuantity, 0);
+    // Same "skip products with no cost set" rule as the Profit KPI tile.
+    const profitCents = inv.items.reduce((sum, item) => {
+      const costCents = item.productId ? costByProductId.get(item.productId) : undefined;
+      if (costCents == null) return sum;
+      return sum + (item.netSoldAmountCents - costCents * item.soldQuantity);
+    }, 0);
     const existing = storeAgg.get(inv.storeId);
     if (existing) {
       existing.qtySold += qtySold;
       existing.qtyDelivered += qtyDelivered;
       existing.revenueCents += inv.calculatedAmountDueCents;
       existing.invoiceCount += 1;
+      existing.profitCents += profitCents;
     } else {
       storeAgg.set(inv.storeId, {
         qtySold,
         qtyDelivered,
         revenueCents: inv.calculatedAmountDueCents,
         invoiceCount: 1,
+        profitCents,
       });
     }
   }
@@ -178,7 +201,7 @@ export default async function DashboardPage(props: {
       qtyUnsold: agg.qtyDelivered - agg.qtySold,
       percentSold: percentSold(agg.qtySold, agg.qtyDelivered),
     }))
-    .sort((a, b) => (b.percentSold ?? -1) - (a.percentSold ?? -1));
+    .sort((a, b) => b.profitCents - a.profitCents);
   const stores = await prisma.store.findMany({
     where: { id: { in: topStoresRaw.map((s) => s.storeId) } },
   });
@@ -425,13 +448,10 @@ export default async function DashboardPage(props: {
                       <T k="sold" elderly={elderly} />
                     </th>
                     <th className="py-2 pr-4">
-                      <T k="unsold" elderly={elderly} />
-                    </th>
-                    <th className="py-2 pr-4">
-                      <T k="percentSold" elderly={elderly} />
-                    </th>
-                    <th className="py-2 pr-4">
                       <T k="revenue" elderly={elderly} />
+                    </th>
+                    <th className="py-2 pr-4">
+                      <T k="profit" elderly={elderly} />
                     </th>
                   </tr>
                 </thead>
@@ -453,9 +473,8 @@ export default async function DashboardPage(props: {
                         </td>
                         <td className="py-2 pr-4 tabular-nums">{row.qtyDelivered}</td>
                         <td className="py-2 pr-4 tabular-nums">{row.qtySold}</td>
-                        <td className="py-2 pr-4 tabular-nums">{row.qtyUnsold}</td>
-                        <td className="py-2 pr-4 tabular-nums">{formatPercent(row.percentSold)}</td>
                         <td className="py-2 pr-4 tabular-nums">{formatCents(row.revenueCents)}</td>
+                        <td className="py-2 pr-4 tabular-nums">{formatCents(row.profitCents)}</td>
                       </tr>
                     );
                   })}
