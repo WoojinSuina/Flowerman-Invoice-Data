@@ -25,14 +25,16 @@ const COLUMN_WIDTH_PX = 92;
  * A two-series grouped bar chart (e.g. revenue + profit) across the 12
  * months of a year. Plain divs, not a charting library — thin bars
  * anchored to the baseline, a direct value label above each bar, and
- * each column links to the Dashboard for that month. Two independent
- * markers can both be shown at once: `selectedMonthValue` (whichever
- * month the rest of the page is scoped to via the picker — the loud
- * amber box) and `todayMonthValue` (today's real calendar month — a
- * smaller blue dot, since it needs to stay visible even when a
- * different month is selected). No client interactivity needed (labels
- * are always visible, not hover-only), so this renders as a plain
- * Server Component.
+ * each column links to the Dashboard for that month. Bars and the month
+ * label live in the SAME flex item per column (not a separate parallel
+ * row of labels) so they can never drift out of alignment with each
+ * other. Two independent markers can both be shown at once:
+ * `selectedMonthValue` (whichever month the rest of the page is scoped
+ * to via the picker — the loud amber box) and `todayMonthValue` (today's
+ * real calendar month — a smaller blue dot, since it needs to stay
+ * visible even when a different month is selected). No client
+ * interactivity needed (labels are always visible, not hover-only), so
+ * this renders as a plain Server Component.
  */
 export function MonthlyBarChart({
   data,
@@ -70,10 +72,7 @@ export function MonthlyBarChart({
         </span>
       </div>
       <div className="overflow-x-auto">
-        <div
-          className="flex items-end"
-          style={{ height: CHART_HEIGHT_PX + 28, minWidth: totalWidth }}
-        >
+        <div className="flex items-end" style={{ minWidth: totalWidth }}>
           {data.map((d) => {
             const isSelected = d.monthValue === selectedMonthValue;
             const isToday = d.monthValue === todayMonthValue;
@@ -86,10 +85,10 @@ export function MonthlyBarChart({
                 href={`/dashboard?month=${d.monthValue}`}
                 className={
                   isSelected
-                    ? "group relative flex flex-col items-center justify-end rounded-lg border-2 border-amber-400 bg-amber-50"
-                    : "group relative flex flex-col items-center justify-end rounded-lg border-2 border-transparent hover:bg-gray-50"
+                    ? "group relative flex flex-col items-center rounded-lg border-2 border-amber-400 bg-amber-50 pt-1"
+                    : "group relative flex flex-col items-center rounded-lg border-2 border-transparent pt-1 hover:bg-gray-50"
                 }
-                style={{ flex: `1 0 ${COLUMN_WIDTH_PX}px`, height: CHART_HEIGHT_PX + 28 }}
+                style={{ flex: `1 0 ${COLUMN_WIDTH_PX}px` }}
               >
                 {isToday && (
                   <span
@@ -97,7 +96,7 @@ export function MonthlyBarChart({
                     title="Current month"
                   />
                 )}
-                <div className="flex items-end gap-1.5">
+                <div className="flex items-end gap-1.5" style={{ height: CHART_HEIGHT_PX }}>
                   <div className="flex flex-col items-center justify-end" style={{ height: CHART_HEIGHT_PX }}>
                     <span
                       className={
@@ -127,28 +126,18 @@ export function MonthlyBarChart({
                     />
                   </div>
                 </div>
+                <div
+                  className={
+                    isSelected
+                      ? "mt-1 text-center text-xs font-bold text-amber-800"
+                      : isToday
+                        ? "mt-1 text-center text-xs font-semibold text-blue-700"
+                        : "mt-1 text-center text-xs text-gray-500"
+                  }
+                >
+                  {d.label}
+                </div>
               </Link>
-            );
-          })}
-        </div>
-        <div className="mt-1 flex" style={{ minWidth: totalWidth }}>
-          {data.map((d) => {
-            const isSelected = d.monthValue === selectedMonthValue;
-            const isToday = d.monthValue === todayMonthValue;
-            return (
-              <div
-                key={d.monthValue}
-                className={
-                  isSelected
-                    ? "text-center text-xs font-bold text-amber-800"
-                    : isToday
-                      ? "text-center text-xs font-semibold text-blue-700"
-                      : "text-center text-xs text-gray-500"
-                }
-                style={{ flex: `1 0 ${COLUMN_WIDTH_PX}px` }}
-              >
-                {d.label}
-              </div>
             );
           })}
         </div>
