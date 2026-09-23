@@ -65,6 +65,10 @@ model Store {
 model Product {
   id        String   @id @default(uuid())
   name      String   @unique
+  // What FLOWER MAN pays per unit (wholesale/production cost), set by hand
+  // per product — null until someone sets it, since it isn't in the
+  // invoice data anywhere. Used to turn revenue into actual profit.
+  costCents Int?     @map("cost_cents")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

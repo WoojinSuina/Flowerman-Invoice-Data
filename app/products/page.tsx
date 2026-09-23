@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { formatCents } from "@/lib/money";
 import { NavBar } from "@/components/NavBar";
 import { MergeProductButton } from "@/components/products/MergeProductButton";
+import { ProductCostInput } from "@/components/products/ProductCostInput";
 
 // Reads live from Prisma on every request — without this, Next prerenders
 // the page as static HTML at build time and it never reflects new data.
@@ -44,6 +45,8 @@ export default async function ProductsListPage() {
                 <th className="py-2 pr-4">Product</th>
                 <th className="py-2 pr-4">Qty sold</th>
                 <th className="py-2 pr-4">Revenue</th>
+                <th className="py-2 pr-4">Cost/unit</th>
+                <th className="py-2 pr-4">Profit</th>
                 <th className="py-2 pr-4">Times seen</th>
                 <th className="py-2 pr-4">Avg. confidence</th>
                 <th className="py-2 pr-4">Duplicate?</th>
@@ -56,12 +59,26 @@ export default async function ProductsListPage() {
                 const otherProducts = products
                   .filter((p) => p.id !== row.productId)
                   .map((p) => ({ id: p.id, name: p.name }));
+                const soldQuantity = row._sum.soldQuantity ?? 0;
+                const revenueCents = row._sum.netSoldAmountCents ?? 0;
+                const profitCents =
+                  product?.costCents != null ? revenueCents - product.costCents * soldQuantity : null;
                 return (
                   <tr key={row.productId} className="border-b">
                     <td className="py-2 pr-4">{product?.name ?? "Unknown"}</td>
-                    <td className="py-2 pr-4 tabular-nums">{row._sum.soldQuantity ?? 0}</td>
+                    <td className="py-2 pr-4 tabular-nums">{soldQuantity}</td>
+                    <td className="py-2 pr-4 tabular-nums">{formatCents(revenueCents)}</td>
                     <td className="py-2 pr-4 tabular-nums">
-                      {formatCents(row._sum.netSoldAmountCents ?? 0)}
+                      {row.productId && (
+                        <ProductCostInput productId={row.productId} costCents={product?.costCents ?? null} />
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 tabular-nums">
+                      {profitCents !== null ? (
+                        formatCents(profitCents)
+                      ) : (
+                        <span className="text-gray-400">set cost</span>
+                      )}
                     </td>
                     <td className="py-2 pr-4 tabular-nums">{row._count}</td>
                     <td className="py-2 pr-4 tabular-nums">
