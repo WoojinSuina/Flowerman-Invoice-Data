@@ -20,3 +20,7 @@
 *.pem
 npm-debug.log*
 *.tsbuildinfo
+
+# scan-uploader-windows's real config (holds the upload token) - the
+# .example template stays tracked, this one never should.
+scripts/scan-uploader-windows/config.ps1

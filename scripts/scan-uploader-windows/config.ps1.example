@@ -1,0 +1,31 @@
+# Copy this file to "config.ps1" in this same folder and fill in the
+# values below (see README.md in this directory). upload-watcher.ps1
+# loads config.ps1 automatically if it exists - config.ps1 itself is
+# gitignored-by-convention here (it holds your upload token), so keep it
+# local to this computer, don't commit or share it.
+
+# Folder your scanner software saves finished scans to.
+$WatchDir = "$env:USERPROFILE\Scans"
+
+# Successfully-uploaded files are moved here (timestamped, never
+# overwritten) instead of staying in WatchDir or being deleted.
+$UploadedDir = Join-Path $WatchDir "uploaded"
+
+# Files that failed to upload are moved here so they don't get retried
+# forever and silently clutter WatchDir - check this folder if invoices
+# seem to be going missing.
+$FailedDir = Join-Path $WatchDir "failed"
+
+# The deployed FLOWER MAN app's base URL, no trailing slash.
+$AppUrl = "https://your-app.vercel.app"
+
+# Must match UPLOAD_API_TOKEN in the app's own environment variables.
+$UploadToken = ""
+
+# How many seconds a file must sit untouched before it's considered done
+# being written. Raise this if your scanner is slow to finish a
+# multi-page scan and files sometimes get uploaded mid-write.
+$MinAgeSeconds = 10
+
+# Where this script logs its own activity.
+$LogFile = "$env:USERPROFILE\FlowermanScanUploader\upload-watcher.log"

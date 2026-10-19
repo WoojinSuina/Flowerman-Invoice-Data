@@ -467,16 +467,21 @@ security patches. Notable side effects:
   existing cookie and internal-secret paths, scoped to just the two
   upload routes above. Built for `scripts/scan-uploader/` (see below) but
   usable by any future unattended client.
-- **`scripts/scan-uploader/`** — a dependency-free (bash + curl only, no
-  Node/Python required) watcher for a computer that isn't running this
-  app: point it at the folder your scanner saves finished scans to, and
-  it uploads each new file automatically via the flow above, using
-  `UPLOAD_API_TOKEN`. Installs as a macOS LaunchAgent (`launchd`) so it
-  starts automatically and reacts to new files via `WatchPaths`, with a
-  periodic fallback poll in case a filesystem event is missed. After a
-  scan uploads, check the Jobs tab in the app to see the invoice's total
-  once extraction finishes (a few seconds) — e.g. to cross-check against
-  cash in hand. See that directory's own README for setup.
+- **`scripts/scan-uploader/`** (macOS) / **`scripts/scan-uploader-windows/`**
+  (Windows) — a dependency-free watcher for a computer that isn't running
+  this app: point it at the folder your scanner saves finished scans to,
+  and it uploads each new file automatically via the flow above, using
+  `UPLOAD_API_TOKEN`. The macOS version is bash + curl, installed as a
+  LaunchAgent (`launchd`) so it starts automatically and reacts to new
+  files via `WatchPaths`, with a periodic fallback poll in case a
+  filesystem event is missed. The Windows version is PowerShell only,
+  installed as a Scheduled Task that polls the folder once a minute
+  instead of reacting to new files instantly — a scan shows up within
+  about a minute rather than within seconds, which was an acceptable
+  tradeoff for how this is actually used. After a scan uploads,
+  check the Jobs tab in the app to see the invoice's total once
+  extraction finishes (a few seconds) — e.g. to cross-check against cash
+  in hand. See either directory's own README for setup.
 
 ## What's NOT built yet (by design — see Phases below)
 
