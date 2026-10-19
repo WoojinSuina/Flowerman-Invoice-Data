@@ -55,10 +55,20 @@ Windows 10/11 machine. No Node, Python, or anything else to install.
    log line explains what failed (bad token, unreachable URL, wrong
    file type, etc.) and the file moves to `<WatchDir>\failed\` instead
    of retrying forever.
-4. Install the scheduled task so it runs automatically from now on:
+4. Install the scheduled task so it runs automatically from now on.
+   This needs an **elevated (Administrator)** PowerShell window — right
+   click PowerShell in the Start menu → "Run as administrator" — or
+   `Register-ScheduledTask` fails with "Access is denied":
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\install-task.ps1
    ```
+   This also generates `run-hidden.vbs` in this same folder — the task
+   runs the watcher through that instead of calling PowerShell directly,
+   since PowerShell's own `-WindowStyle Hidden` still briefly flashes a
+   console window every run under Task Scheduler; launching through a
+   VBScript wrapper (`WScript.Shell.Run` with window style `0`) avoids
+   that entirely. Re-running `install-task.ps1` regenerates it, so it's
+   safe to delete and isn't tracked in git.
 5. Scan something. It should upload within about a minute - the task
    checks the folder every 60 seconds. Check the log file if not, then
    check the Jobs tab in the app for the total.

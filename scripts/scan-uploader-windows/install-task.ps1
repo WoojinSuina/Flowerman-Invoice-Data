@@ -9,14 +9,27 @@ $ErrorActionPreference = "Stop"
 
 $TaskName = "FlowermanScanUploader"
 $ScriptPath = Join-Path $PSScriptRoot "upload-watcher.ps1"
+$WrapperPath = Join-Path $PSScriptRoot "run-hidden.vbs"
 
 if (-not (Test-Path (Join-Path $PSScriptRoot "config.ps1"))) {
     Write-Host "config.ps1 not found next to this script - copy config.ps1.example to config.ps1 and fill it in first." -ForegroundColor Yellow
     exit 1
 }
 
-$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`""
+# powershell.exe's own -WindowStyle Hidden still briefly flashes a
+# console window under Task Scheduler's Interactive logon type - the
+# standard fix is to launch it through a tiny VBScript wrapper instead,
+# since WScript.Shell.Run with window style 0 never allocates a visible
+# console in the first place. Regenerated on every install so it always
+# points at this install's actual script path.
+$escapedScriptPath = $ScriptPath -replace '"', '""'
+@"
+Set objShell = CreateObject("WScript.Shell")
+objShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""$escapedScriptPath""", 0, True
+"@ | Set-Content -Path $WrapperPath -Encoding ASCII
+
+$action = New-ScheduledTaskAction -Execute "wscript.exe" `
+    -Argument "`"$WrapperPath`""
 
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
