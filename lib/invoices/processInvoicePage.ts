@@ -6,7 +6,7 @@ import { isLikelyDuplicate } from "@/lib/invoices/duplicateDetection";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
-import { extractBrand, isConsignmentStore } from "@/lib/stores";
+import { extractBrand, isConsignmentStore, isUnfamiliarAddress } from "@/lib/stores";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
 import { rotatePageBuffer } from "@/lib/invoices/rotatePage";
 import { uploadInvoiceFile } from "@/lib/storage/supabase";
@@ -23,8 +23,16 @@ import { uploadInvoiceFile } from "@/lib/storage/supabase";
  * name and address are resynced to the latest extraction on every match,
  * since they're display info only now — a noisy read of either can't
  * corrupt matching the way it used to when they were the identity key.
+ *
+ * addressMismatchNote is set when a match was found but its address
+ * doesn't look like the one already on file (see isUnfamiliarAddress) —
+ * brand+number isn't a perfect identity, so this is the caller's signal
+ * to force REVIEW instead of silently attaching the invoice to what might
+ * be a different real store that happens to share this number and brand.
  */
-async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
+async function resolveStore(
+  extracted: ExtractedInvoice
+): Promise<{ store: Store; addressMismatchNote: string | null }> {
   const address = extracted.storeAddress?.trim() || null;
   const name = extracted.storeName;
   const brand = extractBrand(name);
@@ -35,18 +43,20 @@ async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   const existing = sameNumber.find((candidate) => extractBrand(candidate.name) === brand) ?? null;
 
   if (existing) {
-    if (existing.name !== name || existing.address !== address) {
-      return prisma.store.update({
-        where: { id: existing.id },
-        data: { name, address },
-      });
-    }
-    return existing;
+    const addressMismatchNote = isUnfamiliarAddress(existing.address, address)
+      ? `This invoice's address ("${address}") doesn't look like the address on file for ${existing.name} (store #${extracted.storeNumber}): "${existing.address}". Possible different location sharing this store number/brand — verify before approving.`
+      : null;
+    const store =
+      existing.name !== name || existing.address !== address
+        ? await prisma.store.update({ where: { id: existing.id }, data: { name, address } })
+        : existing;
+    return { store, addressMismatchNote };
   }
 
-  return prisma.store.create({
+  const store = await prisma.store.create({
     data: { storeNumber: extracted.storeNumber, name, address },
   });
+  return { store, addressMismatchNote: null };
 }
 
 export interface ProcessPageInput {
@@ -129,7 +139,9 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
   let store: Store | undefined;
 
   try {
-    store = await resolveStore(extracted);
+    const resolved = await resolveStore(extracted);
+    store = resolved.store;
+    const addressMismatchNote = resolved.addressMismatchNote;
 
     // A return can credit stock delivered in a PRIOR cycle for a
     // consignment store (see isConsignmentStore) — a product showing 0
@@ -200,15 +212,17 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
     // no exception left for a human to resolve, so skip the manual Approve
     // click and go straight to APPROVED (still logged in the audit trail,
     // just with "system" as the actor instead of a person). A possible
-    // duplicate or an impossible (future) date always forces REVIEW
-    // regardless, since both are exactly the kind of exception a human
-    // needs to resolve.
+    // duplicate, an impossible (future) date, or an unfamiliar address on
+    // an existing store match always forces REVIEW regardless, since all
+    // three are exactly the kind of exception a human needs to resolve.
     const autoApproved =
       !possibleDuplicate &&
       !invoiceDateIsFuture &&
+      !addressMismatchNote &&
       result.status === "PASS" &&
       result.differenceCents === 0;
-    const finalStatus = possibleDuplicate || invoiceDateIsFuture ? "REVIEW" : result.status;
+    const finalStatus =
+      possibleDuplicate || invoiceDateIsFuture || addressMismatchNote ? "REVIEW" : result.status;
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -225,6 +239,7 @@ export async function processInvoicePage(input: ProcessPageInput): Promise<Proce
         validationStatus: autoApproved ? "APPROVED" : finalStatus,
         approvedAt: autoApproved ? new Date() : null,
         possibleDuplicateOfId: possibleDuplicate?.id ?? null,
+        addressMismatchNote,
         validationSuggestions: result.suggestions as unknown as Prisma.InputJsonValue,
         rawExtraction,
         sourceFile: sourceFileName,

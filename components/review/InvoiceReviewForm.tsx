@@ -31,6 +31,7 @@ interface ReviewInvoice {
   items: ReviewItem[];
   duplicateOf?: { id: string; invoiceNumber: string; sourceImageUrl: string | null } | null;
   autoApprovedReason?: string | null;
+  addressMismatchNote?: string | null;
   isConsignment: boolean;
 }
 
@@ -353,6 +354,12 @@ export function InvoiceReviewForm({ invoice }: { invoice: ReviewInvoice }) {
             delivery can&apos;t happen in the future. Usually a month/day swap
             on a hard-to-read scan; check the image and correct the date
             below before approving.
+          </div>
+        )}
+
+        {invoice.addressMismatchNote && (
+          <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {invoice.addressMismatchNote}
           </div>
         )}
 

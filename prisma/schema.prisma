@@ -127,6 +127,17 @@ model Invoice {
   // ones nobody's eyes have actually been on. See lib/reviewFilters.ts.
   autoApprovedReason String? @map("auto_approved_reason")
 
+  // Set at ingestion when this invoice matched an existing Store by
+  // (storeNumber, brand) — see resolveStore() — but its address didn't
+  // look like the address already on file for that store. Forces REVIEW
+  // the same as a possible duplicate or a future date: brand+number isn't
+  // a perfect identity (the same number has been reused across different
+  // real locations of the same brand before), so an address that looks
+  // unfamiliar needs a human to confirm this wasn't actually a different
+  // store. Null means either no existing store matched (new store, no
+  // address history to compare against) or the address matched fine.
+  addressMismatchNote String? @map("address_mismatch_note")
+
   items               InvoiceItem[]
   manualCorrections   ManualCorrection[]
   extractionAttempts  ExtractionAttempt[]

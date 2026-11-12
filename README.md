@@ -231,6 +231,15 @@ security patches. Notable side effects:
   (two real locations that happened to share a legacy number, not a
   duplicate) and need a manual look via the merge tool below if that turns
   out wrong.
+- **Matching on (storeNumber, brand) alone can still collide** — the same
+  number has been reused across different real locations of the same
+  brand too (not just different brands), confirmed on real data. As a
+  safety net, `resolveStore()` compares a matched invoice's address
+  against the address already on file for that store (`isUnfamiliarAddress()`
+  in `lib/stores.ts`, a character-bigram similarity check tolerant of OCR
+  noise but not a genuinely different street address) and forces REVIEW
+  with an explanatory `Invoice.addressMismatchNote` instead of silently
+  attaching it, the same way a possible duplicate or a future date does.
 - Same OCR-duplicate risk as products: `app/api/stores/merge/route.ts` +
   `MergeStoreButton` on `/stores` let you manually merge two store rows
   that turn out to be the same real location under slightly different

@@ -71,3 +71,51 @@ export function normalizeStoreIdentity(store: {
 export function extractBrand(name: string): string {
   return name.trim().toUpperCase().split(/\s+/)[0] ?? "";
 }
+
+function bigramSet(value: string): Set<string> {
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const bigrams = new Set<string>();
+  for (let i = 0; i < normalized.length - 1; i++) {
+    bigrams.add(normalized.slice(i, i + 2));
+  }
+  return bigrams;
+}
+
+// Character-bigram Dice coefficient — tolerant of the single-letter
+// typos, transpositions, and truncated/appended noise OCR produces on the
+// SAME real address (e.g. "MACCART AVE" read as "MAGCART AVE", or a
+// trailing "CASH"/"CON" that comes and goes), while still scoring two
+// genuinely different street addresses as dissimilar even when they
+// share a city or highway name.
+function diceCoefficient(a: string, b: string): number {
+  const bigramsA = bigramSet(a);
+  const bigramsB = bigramSet(b);
+  if (bigramsA.size === 0 && bigramsB.size === 0) return 1;
+  if (bigramsA.size === 0 || bigramsB.size === 0) return 0;
+  let shared = 0;
+  for (const bigram of bigramsA) {
+    if (bigramsB.has(bigram)) shared++;
+  }
+  return (2 * shared) / (bigramsA.size + bigramsB.size);
+}
+
+// Picked from real examples: ordinary OCR noise on the same address
+// scores well above this (e.g. "MACCART AVE FT WORTH/I:CON" vs "MAGCART
+// AVE FT WORTH/I 20N" ~0.85); two different real addresses that happened
+// to collide on a (storeNumber, brand) pair score well below it (e.g.
+// "2221 W SEMINARY DR FT WORTH" vs "MACCART AVE FT WORTH/I:CON" ~0.33,
+// an actual collision found in this app's own data).
+const ADDRESS_SIMILARITY_THRESHOLD = 0.5;
+
+/**
+ * True when a newly extracted address looks like a different real
+ * location than the one already on file for the same (storeNumber,
+ * brand) — the signal resolveStore() uses to flag a possible store
+ * collision for REVIEW instead of silently attaching an invoice to the
+ * wrong store's history. No address on either side (nothing on file yet,
+ * or nothing extracted this time) means nothing to compare — not flagged.
+ */
+export function isUnfamiliarAddress(onFile: string | null, extracted: string | null): boolean {
+  if (!onFile || !extracted) return false;
+  return diceCoefficient(onFile, extracted) < ADDRESS_SIMILARITY_THRESHOLD;
+}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractBrand, isConsignmentStore, normalizeStoreIdentity } from "./stores.ts";
+import { extractBrand, isConsignmentStore, isUnfamiliarAddress, normalizeStoreIdentity } from "./stores.ts";
 
 test("isConsignmentStore: plain CON suffix on address", () => {
   assert.equal(isConsignmentStore({ name: "EXXON", address: "4307 DUNCANVILLE RD CON" }), true);
@@ -74,4 +74,32 @@ test("extractBrand: is case-insensitive", () => {
 
 test("extractBrand: surrounding whitespace is trimmed", () => {
   assert.equal(extractBrand("  EXXON  BELT LINE"), "EXXON");
+});
+
+test("isUnfamiliarAddress: real OCR noise on the same address is not flagged", () => {
+  assert.equal(
+    isUnfamiliarAddress("MACCART AVE FT WORTH/I:CON", "MAGCART AVE FT WORTH/I 20N"),
+    false
+  );
+});
+
+test("isUnfamiliarAddress: a genuinely different address is flagged", () => {
+  // A real collision found in this app's data: two different real SHELL
+  // locations ended up sharing a (storeNumber, brand) pair.
+  assert.equal(
+    isUnfamiliarAddress("2221 W SEMINARY DR FT WORTH", "MACCART AVE FT WORTH/I:CON"),
+    true
+  );
+});
+
+test("isUnfamiliarAddress: identical addresses are not flagged", () => {
+  assert.equal(isUnfamiliarAddress("2800 N MACARTHUR BLVD IRVING", "2800 N MACARTHUR BLVD IRVING"), false);
+});
+
+test("isUnfamiliarAddress: nothing on file yet is not flagged", () => {
+  assert.equal(isUnfamiliarAddress(null, "ANY ADDRESS"), false);
+});
+
+test("isUnfamiliarAddress: nothing extracted this time is not flagged", () => {
+  assert.equal(isUnfamiliarAddress("ON FILE ADDRESS", null), false);
 });
