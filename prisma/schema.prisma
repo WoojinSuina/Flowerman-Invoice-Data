@@ -38,15 +38,16 @@ enum JobStatus {
 
 model Store {
   id          String   @id @default(uuid())
-  // Not unique: the printed store number is unreliable (OCR misreads),
-  // and multiple genuinely different locations of the same chain can
-  // share numbering schemes. (name, address) together are the real
-  // identity — see lib/invoices/processInvoicePage.ts's resolveStore().
-  // Address alone isn't always enough: some invoices print no separate
-  // street address, just a compact "brand + road + town" description
-  // (e.g. "EXXON BELT LINE WILLMER" vs "SHELL I-45/BELTLINE WILLMER"),
-  // and the name/address split can leave two different real stores
-  // both with the same short trailing address ("WILLMER").
+  // Identity is (storeNumber, brand word of name) together — see
+  // lib/invoices/processInvoicePage.ts's resolveStore() and
+  // lib/stores.ts's extractBrand(). Not a DB-level unique constraint:
+  // brand is derived from name (its first word), not its own column, and
+  // the printed number alone has been confirmed, on real data, to get
+  // reused across different real brands at different points — adding a
+  // bare @unique on storeNumber would either reject that legitimate reuse
+  // or require resolving every historical collision by hand first.
+  // name/address are display info, resynced to the latest extraction on
+  // every match.
   storeNumber String   @map("store_number")
   name        String
   address     String?
@@ -54,8 +55,6 @@ model Store {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   invoices Invoice[]
-
-  @@unique([name, address])
 
   @@map("stores")
 }

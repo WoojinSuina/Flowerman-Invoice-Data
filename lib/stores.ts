@@ -59,3 +59,15 @@ export function normalizeStoreIdentity(store: {
     address: store.address != null ? normalizeStoreWords(store.address) : null,
   };
 }
+
+/**
+ * The brand/chain word a store's identity is keyed on alongside its
+ * printed number — see resolveStore(). Confirmed on real data: the first
+ * word of the extracted name (SHELL, EXXON, CHEVRON, VALERO, 7-11, ...)
+ * stays consistent across rescans even when the rest of the name/address
+ * split drifts (e.g. "VALERO" vs "VALERO FOREST HILL / ENON" for the same
+ * store), so it's a safer identity signal than the full name string.
+ */
+export function extractBrand(name: string): string {
+  return name.trim().toUpperCase().split(/\s+/)[0] ?? "";
+}

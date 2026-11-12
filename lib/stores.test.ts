@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isConsignmentStore, normalizeStoreIdentity } from "./stores.ts";
+import { extractBrand, isConsignmentStore, normalizeStoreIdentity } from "./stores.ts";
 
 test("isConsignmentStore: plain CON suffix on address", () => {
   assert.equal(isConsignmentStore({ name: "EXXON", address: "4307 DUNCANVILLE RD CON" }), true);
@@ -58,4 +58,20 @@ test("normalizeStoreIdentity: an address with no marker at all is unchanged", ()
 
 test("normalizeStoreIdentity: null address stays null", () => {
   assert.deepEqual(normalizeStoreIdentity({ name: "VALERO", address: null }), { name: "VALERO", address: null });
+});
+
+test("extractBrand: a bare brand name is itself", () => {
+  assert.equal(extractBrand("SHELL"), "SHELL");
+});
+
+test("extractBrand: extra address text folded into name is dropped", () => {
+  assert.equal(extractBrand("VALERO FOREST HILL / ENON"), "VALERO");
+});
+
+test("extractBrand: is case-insensitive", () => {
+  assert.equal(extractBrand("shell"), "SHELL");
+});
+
+test("extractBrand: surrounding whitespace is trimmed", () => {
+  assert.equal(extractBrand("  EXXON  BELT LINE"), "EXXON");
 });

@@ -6,67 +6,39 @@ import { isLikelyDuplicate } from "@/lib/invoices/duplicateDetection";
 import { prisma } from "@/lib/db/client";
 import { dollarsToCents } from "@/lib/money";
 import { isFutureDate } from "@/lib/dates";
-import { isConsignmentStore, normalizeStoreIdentity } from "@/lib/stores";
+import { extractBrand, isConsignmentStore } from "@/lib/stores";
 import type { ExtractedInvoice } from "@/lib/extraction/types";
 import { rotatePageBuffer } from "@/lib/invoices/rotatePage";
 import { uploadInvoiceFile } from "@/lib/storage/supabase";
 
 /**
- * A store's identity is (name, address) together, not the printed store
- * number — the number is unreliable (OCR misreads), and different real
- * locations of the same chain can otherwise collide. Address alone isn't
- * always enough either: some invoices print no separate street address,
- * just a compact "brand + road + town" description, and the name/address
- * split can leave two different real stores with the same short trailing
- * address (e.g. both ending up with just the town name). Falls back to
- * matching by number only when no address was extracted at all, so a page
- * with no readable address doesn't spawn a duplicate store on every upload.
- *
- * If the exact match misses, falls back to a normalized comparison (see
- * normalizeStoreIdentity) before creating a new row — confirmed live that
- * the same real store's trailing consignment marker gets read as "*CON",
- * "*GON", "TCON", or dropped entirely across different scans, and without
- * this, each variant spawned its own Store row, splitting one location's
- * invoice history and letting a genuine re-scan slip past duplicate
- * detection (which is scoped by storeId).
+ * A store's identity is its printed store number together with its brand
+ * (see extractBrand) — invoices now carry a reliable, unique per-location
+ * number, replacing the old (name, address) identity match, which
+ * fragmented the same real store into multiple rows whenever OCR read the
+ * full name/address differently between scans. The number alone isn't
+ * enough: confirmed on real data that the same printed number has been
+ * reused across different real brands at different points, so brand is
+ * still checked to avoid merging two actually-different stores together.
+ * name and address are resynced to the latest extraction on every match,
+ * since they're display info only now — a noisy read of either can't
+ * corrupt matching the way it used to when they were the identity key.
  */
 async function resolveStore(extracted: ExtractedInvoice): Promise<Store> {
   const address = extracted.storeAddress?.trim() || null;
   const name = extracted.storeName;
+  const brand = extractBrand(name);
 
-  let existing = address
-    ? await prisma.store.findUnique({ where: { name_address: { name, address } } })
-    : await prisma.store.findFirst({ where: { storeNumber: extracted.storeNumber } });
-
-  if (!existing && address) {
-    const target = normalizeStoreIdentity({ name, address });
-    const sameNameCandidates = await prisma.store.findMany({ where: { name } });
-    existing =
-      sameNameCandidates.find((candidate) => {
-        const normalized = normalizeStoreIdentity({ name: candidate.name, address: candidate.address });
-        return normalized.name === target.name && normalized.address === target.address;
-      }) ?? null;
-  }
+  const sameNumber = await prisma.store.findMany({
+    where: { storeNumber: extracted.storeNumber },
+  });
+  const existing = sameNumber.find((candidate) => extractBrand(candidate.name) === brand) ?? null;
 
   if (existing) {
-    // Real bug, confirmed live: overwriting name/address with every fresh
-    // extraction let a single noisier read (e.g. "RESTAURANT" -> "RTAURANT")
-    // corrupt the stored identity, which then made the NEXT, correctly-read
-    // scan of the same invoice fail to match this row at all (both the
-    // exact lookup and the normalized fallback above key on name) and spawn
-    // a brand new Store row — the same invoice got created three separate
-    // times before this was caught. Identity now stays stable once set;
-    // only fills in an address that was previously missing (the one case
-    // the original design needed this for), and always keeps storeNumber
-    // current since it's purely informational, never part of the identity.
-    const needsAddress = !existing.address && address;
-    if (needsAddress || existing.storeNumber !== extracted.storeNumber) {
+    if (existing.name !== name || existing.address !== address) {
       return prisma.store.update({
         where: { id: existing.id },
-        data: {
-          storeNumber: extracted.storeNumber,
-          ...(needsAddress ? { address } : {}),
-        },
+        data: { name, address },
       });
     }
     return existing;
